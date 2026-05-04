@@ -1005,6 +1005,30 @@ pre {
   padding: 24px;
 }
 
+.playgroundLaunch {
+  position: relative;
+  overflow: hidden;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  background:
+    radial-gradient(circle at 92% 18%, rgba(47, 112, 255, 0.18), transparent 28%),
+    linear-gradient(135deg, #ffffff 0%, #eaf8f6 100%);
+}
+
+.playgroundLaunch > div > span {
+  display: block;
+  color: var(--teal-dark);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.playgroundLaunch h2 {
+  margin: 8px 0 0;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
 .panelHeader h2 {
   font-size: 26px;
 }
@@ -1162,6 +1186,314 @@ pre {
   animation: spin 900ms linear infinite;
 }
 
+.playgroundShell {
+  min-height: 100vh;
+  padding: 24px clamp(18px, 4vw, 56px) 54px;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(15, 155, 142, 0.16), transparent 28%),
+    radial-gradient(circle at 86% 8%, rgba(47, 112, 255, 0.16), transparent 24%),
+    #f6f9f8;
+}
+
+.playgroundTopbar {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.playgroundTopbar nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.playgroundTopbar nav a {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: #40514d;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.playgroundHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 24px;
+  padding: 46px 0 30px;
+}
+
+.playgroundHero h1 {
+  margin: 0;
+  font-size: clamp(44px, 7vw, 82px);
+  line-height: 0.96;
+}
+
+.playgroundHero p {
+  max-width: 700px;
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.playgroundPulse {
+  min-width: 280px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(15, 155, 142, 0.28);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+  color: #253d38;
+  font-weight: 850;
+}
+
+.playgroundPulse svg {
+  color: var(--teal);
+}
+
+.playgroundWorkspace {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1.18fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.requestStudio,
+.liveConsole {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.requestStudio {
+  position: sticky;
+  top: 18px;
+}
+
+.studioSection {
+  display: grid;
+  gap: 10px;
+}
+
+.fieldLabel,
+.studioHeading strong {
+  color: #243833;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.studioHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.studioHeading span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.urlInput,
+.plainInput {
+  height: 50px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.urlInput {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  color: var(--teal-dark);
+}
+
+.urlInput input,
+.plainInput {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.formatGrid,
+.modeGrid,
+.statusStrip {
+  display: grid;
+  gap: 10px;
+}
+
+.formatGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.formatGrid button,
+.modeGrid button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+  color: #344642;
+  text-align: left;
+  font-weight: 850;
+}
+
+.formatGrid button {
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.formatGrid button svg {
+  color: #9aaba7;
+}
+
+.formatGrid button.selected,
+.modeGrid button.selected {
+  border-color: rgba(15, 155, 142, 0.42);
+  background: #e8f7f5;
+  color: var(--teal-dark);
+}
+
+.formatGrid button.selected svg {
+  color: var(--teal);
+}
+
+.modeGrid button {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+}
+
+.modeGrid button span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.studioActions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.studioActions button {
+  border: 0;
+}
+
+.statusStrip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.statusTile {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.statusTile svg {
+  color: var(--teal);
+}
+
+.statusTile span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.statusTile strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.largeProgress {
+  padding: 18px;
+}
+
+.resultSummary {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(24, 160, 88, 0.28);
+  border-radius: 8px;
+  background: #effaf4;
+}
+
+.resultSummary svg {
+  flex: 0 0 auto;
+  color: var(--green);
+}
+
+.resultSummary strong {
+  color: #203631;
+}
+
+.resultSummary p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.consoleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.consoleHeader span,
+.consoleHeader button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 900;
+}
+
+.consoleHeader span {
+  color: #31423e;
+}
+
+.consoleHeader button {
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: white;
+  color: var(--teal-dark);
+}
+
+.liveConsole pre {
+  min-height: 420px;
+  padding: 20px;
+  border-radius: 8px;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -1251,7 +1583,9 @@ pre {
   }
 
   .authShell,
-  .dashboardShell {
+  .dashboardShell,
+  .playgroundWorkspace,
+  .playgroundHero {
     grid-template-columns: 1fr;
   }
 
@@ -1262,6 +1596,10 @@ pre {
   .dashboardSidebar {
     position: static;
     height: auto;
+  }
+
+  .requestStudio {
+    position: static;
   }
 }
 
@@ -1312,7 +1650,8 @@ pre {
   }
 
   .authShell,
-  .dashboardMain {
+  .dashboardMain,
+  .playgroundShell {
     padding: 16px;
   }
 
@@ -1330,6 +1669,9 @@ pre {
   .dashboardTop,
   .panelHeader,
   .playgroundControls,
+  .playgroundTopbar,
+  .studioActions,
+  .consoleHeader,
   .dashboardActions,
   .progressMeta,
   .tableList article {
@@ -1339,6 +1681,18 @@ pre {
 
   .progressMeta span {
     white-space: normal;
+  }
+
+  .playgroundTopbar nav,
+  .statusStrip,
+  .formatGrid {
+    grid-template-columns: 1fr;
+    display: grid;
+    width: 100%;
+  }
+
+  .playgroundPulse {
+    min-width: 0;
   }
 
   .steps::before {

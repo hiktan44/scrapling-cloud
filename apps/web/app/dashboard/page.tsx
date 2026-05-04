@@ -5,7 +5,6 @@ import {
   ArrowRight,
   BookOpenText,
   Copy,
-  ExternalLink,
   KeyRound,
   Loader2,
   LogOut,
@@ -45,14 +44,6 @@ type Job = {
   url: string | null;
 };
 
-type ProgressState = {
-  visible: boolean;
-  percent: number;
-  status: string;
-  message: string;
-  tone: "active" | "success" | "error";
-};
-
 export default function DashboardPage() {
   const [apiKey, setApiKey] = useState("");
   const [workspace, setWorkspace] = useState("Workspace");
@@ -60,18 +51,9 @@ export default function DashboardPage() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [newKey, setNewKey] = useState("");
-  const [sampleUrl, setSampleUrl] = useState("https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/home");
-  const [playgroundResult, setPlaygroundResult] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
-  const [progress, setProgress] = useState<ProgressState>({
-    visible: false,
-    percent: 0,
-    status: "idle",
-    message: "Hazır",
-    tone: "active"
-  });
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }), [apiKey]);
 
@@ -155,118 +137,6 @@ export default function DashboardPage() {
     }
   }
 
-  async function runScrape() {
-    setWorking(true);
-    setError("");
-    setPlaygroundResult("");
-    setProgress({
-      visible: true,
-      percent: 8,
-      status: "preparing",
-      message: "URL hazırlanıyor",
-      tone: "active"
-    });
-    try {
-      const normalizedUrl = normalizeUrl(sampleUrl);
-      setSampleUrl(normalizedUrl);
-      setProgress({
-        visible: true,
-        percent: 18,
-        status: "sending",
-        message: "Scrape job API'ye gönderiliyor",
-        tone: "active"
-      });
-      const result = await apiFetch("/v1/scrape", {
-        method: "POST",
-        body: JSON.stringify({ url: normalizedUrl, formats: ["markdown", "links", "metadata"], mode: "auto" })
-      });
-      setPlaygroundResult(JSON.stringify(result, null, 2));
-      setProgress({
-        visible: true,
-        percent: 32,
-        status: "queued",
-        message: "Job kuyruğa alındı, worker bekleniyor",
-        tone: "active"
-      });
-      if (typeof result === "object" && result && "id" in result) {
-        await pollJob(String((result as Job).id));
-      }
-      await refresh();
-    } catch (err) {
-      setProgress({
-        visible: true,
-        percent: 100,
-        status: "failed",
-        message: err instanceof Error ? err.message : "Scrape job gönderilemedi",
-        tone: "error"
-      });
-      setError(err instanceof Error ? err.message : "Scrape job gönderilemedi");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  async function pollJob(jobId: string) {
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 1800));
-      const job = await apiFetch<Job & { result?: unknown; error?: string | null }>(`/v1/jobs/${jobId}`);
-      setPlaygroundResult(JSON.stringify(job, null, 2));
-      const status = String(job.status);
-      const percent = Math.min(88, 38 + attempt * 7);
-      setProgress({
-        visible: true,
-        percent: status === "succeeded" ? 100 : status === "failed" ? 100 : percent,
-        status,
-        message: progressMessage(status, attempt),
-        tone: status === "succeeded" ? "success" : status === "failed" ? "error" : "active"
-      });
-      if (!["queued", "running"].includes(status)) {
-        return;
-      }
-    }
-    setProgress({
-      visible: true,
-      percent: 92,
-      status: "still-running",
-      message: "Job hala çalışıyor; Son işler bölümünden takip edebilirsin",
-      tone: "active"
-    });
-  }
-
-  function progressMessage(status: string, attempt: number) {
-    if (status === "queued") {
-      return "Kuyrukta, worker sıraya alıyor";
-    }
-    if (status === "running") {
-      return attempt < 3 ? "Sayfa çekiliyor ve içerik ayrıştırılıyor" : "Sonuç hazırlanıyor";
-    }
-    if (status === "succeeded") {
-      return "Tamamlandı, sonuç hazır";
-    }
-    if (status === "failed") {
-      return "Job hata aldı, detay aşağıdaki sonuçta";
-    }
-    return "Job durumu güncellendi";
-  }
-
-  function normalizeUrl(value: string) {
-    let url = value.trim();
-    url = url.replace(/^https\/\//, "https://").replace(/^http\/\//, "http://");
-    const embeddedProtocol = url.slice(8).search(/https?:\/\/|https\/\//);
-    if (embeddedProtocol >= 0) {
-      url = url.slice(8 + embeddedProtocol).replace(/^https\/\//, "https://").replace(/^http\/\//, "http://");
-    }
-    if (!/^https?:\/\//.test(url)) {
-      throw new Error("Lütfen URL'yi https:// ile birlikte gir.");
-    }
-    try {
-      new URL(url);
-    } catch {
-      throw new Error("URL formatı geçerli değil. Örnek: https://example.com");
-    }
-    return url;
-  }
-
   function logout() {
     localStorage.removeItem("scrapling_cloud_api_key");
     localStorage.removeItem("scrapling_cloud_workspace");
@@ -283,7 +153,7 @@ export default function DashboardPage() {
         <nav>
           <a href="#overview"><Activity size={18} /> Genel bakış</a>
           <a href="#keys"><KeyRound size={18} /> API key</a>
-          <a href="#playground"><ArrowRight size={18} /> Playground</a>
+          <Link href="/playground"><ArrowRight size={18} /> Playground</Link>
           <a href={`${apiUrl}/docs`} target="_blank"><BookOpenText size={18} /> Docs</a>
         </nav>
       </aside>
@@ -352,41 +222,16 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="dashboardPanel playgroundPanel" id="playground">
-          <div className="panelHeader">
-            <div>
-              <h2>Scrape playground</h2>
-              <p>Bir URL gönder, API kuyruğa bir scrape job eklesin.</p>
-            </div>
-            <a className="secondary" href={`${apiUrl}/docs`} target="_blank">
-              Docs
-              <ExternalLink size={18} />
-            </a>
+        <section className="dashboardPanel playgroundLaunch">
+          <div>
+            <span>Canlı test alanı</span>
+            <h2>Scrape Playground ayrı sekmede hazır</h2>
+            <p>URL gönder, formats/mode seç, ilerlemeyi canlı izle ve sonucu geniş ekranda incele.</p>
           </div>
-          <div className="playgroundControls">
-            <input
-              value={sampleUrl}
-              onChange={(event) => setSampleUrl(event.target.value)}
-              onFocus={(event) => event.currentTarget.select()}
-              placeholder="https://example.com"
-            />
-            <button className="primary" onClick={runScrape} disabled={working}>
-              {working ? <Loader2 className="spin" size={18} /> : <ArrowRight size={18} />}
-              Job gönder
-            </button>
-          </div>
-          {progress.visible && (
-            <div className={`progressCard ${progress.tone}`} role="status" aria-live="polite">
-              <div className="progressMeta">
-                <strong>{progress.message}</strong>
-                <span>{progress.status} · {progress.percent}%</span>
-              </div>
-              <div className="progressTrack" aria-label="Scrape progress">
-                <i style={{ width: `${progress.percent}%` }} />
-              </div>
-            </div>
-          )}
-          <pre>{playgroundResult || "Sonuç burada görünecek."}</pre>
+          <Link className="primary" href="/playground">
+            Playground’u aç
+            <ArrowRight size={18} />
+          </Link>
         </section>
 
         <section className="dashboardPanel">
