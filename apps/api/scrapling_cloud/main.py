@@ -2,6 +2,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import __version__
@@ -9,10 +10,13 @@ from .billing import estimate_credits
 from .config import get_settings
 from .db import create_all, get_db
 from .jobs import create_job
-from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind
+from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, Organization, User
 from .schemas import (
     ApiKeyCreate,
     ApiKeyResponse,
+    AuthLogin,
+    AuthResponse,
+    AuthSignup,
     BatchRequest,
     CrawlRequest,
     DomainProfileResponse,
@@ -24,7 +28,7 @@ from .schemas import (
     UsageSummary,
 )
 from .scraper import map_url, scrape_url
-from .security import Principal, create_api_key, hash_api_key, require_api_key
+from .security import Principal, create_api_key, hash_api_key, hash_password, require_api_key, verify_password
 from .seed import seed_demo
 
 settings = get_settings()
@@ -66,8 +70,74 @@ def ready(db: Session = Depends(get_db)) -> dict:
     return {"ok": True}
 
 
+def auth_response(raw_key: str, organization: Organization) -> AuthResponse:
+    return AuthResponse(
+        api_key=raw_key,
+        organization_id=organization.id,
+        organization_name=organization.name,
+        plan=organization.plan,
+        monthly_credits=organization.monthly_credits,
+        concurrency_limit=organization.concurrency_limit,
+    )
+
+
+def create_dashboard_key(db: Session, organization: Organization, name: str = "Dashboard session") -> str:
+    raw_key = create_api_key()
+    db.add(
+        ApiKey(
+            organization_id=organization.id,
+            name=name,
+            key_prefix=raw_key[:10],
+            key_hash=hash_api_key(raw_key),
+            scopes=["scrape", "crawl", "map", "extract"],
+        )
+    )
+    return raw_key
+
+
 def job_response(job: Job) -> JobResponse:
     return JobResponse(id=job.id, status=job.status, kind=job.kind, credits=job.credits, url=job.url)
+
+
+@app.post("/v1/auth/signup", response_model=AuthResponse)
+def signup(payload: AuthSignup, db: Session = Depends(get_db)) -> AuthResponse:
+    email = payload.email.strip().lower()
+    if db.scalar(select(User).where(User.email == email)) is not None:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    organization = Organization(name=payload.organization_name.strip(), plan="starter", monthly_credits=10000, concurrency_limit=3)
+    db.add(organization)
+    db.flush()
+    db.add(User(organization_id=organization.id, email=email, password_hash=hash_password(payload.password), role="owner"))
+    raw_key = create_dashboard_key(db, organization, "Default dashboard key")
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Email already registered") from None
+    db.refresh(organization)
+    return auth_response(raw_key, organization)
+
+
+@app.post("/v1/auth/login", response_model=AuthResponse)
+def login(payload: AuthLogin, db: Session = Depends(get_db)) -> AuthResponse:
+    email = payload.email.strip().lower()
+    user = db.scalar(select(User).where(User.email == email))
+    if user is None or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    organization = db.get(Organization, user.organization_id)
+    if organization is None:
+        raise HTTPException(status_code=401, detail="Invalid organization")
+
+    raw_key = create_dashboard_key(db, organization)
+    db.commit()
+    return auth_response(raw_key, organization)
+
+
+@app.get("/v1/me", response_model=AuthResponse)
+def me(principal: Principal = Depends(require_api_key)) -> AuthResponse:
+    return auth_response(principal.api_key.key_prefix, principal.organization)
 
 
 @app.post("/v1/scrape", response_model=JobResponse)

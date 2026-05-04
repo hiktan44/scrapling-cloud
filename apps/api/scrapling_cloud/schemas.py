@@ -82,6 +82,26 @@ class ApiKeyResponse(BaseModel):
     key: str | None = None
 
 
+class AuthSignup(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    organization_name: str = Field(default="My Workspace", min_length=1, max_length=160)
+
+
+class AuthLogin(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class AuthResponse(BaseModel):
+    api_key: str
+    organization_id: str
+    organization_name: str
+    plan: str
+    monthly_credits: int
+    concurrency_limit: int
+
+
 class UsageSummary(BaseModel):
     plan: str
     monthly_credits: int

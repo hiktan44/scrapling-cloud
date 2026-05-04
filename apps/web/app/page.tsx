@@ -436,8 +436,8 @@ function Header({ locale, setLocale, apiUrl }: { locale: Locale; setLocale: (loc
           <button className={locale === "tr" ? "selected" : ""} onClick={() => setLocale("tr")}>TR</button>
           <button className={locale === "en" ? "selected" : ""} onClick={() => setLocale("en")}>EN</button>
         </div>
-        <a className="signIn" href="#api">{t.signIn}</a>
-        <a className="headerCta" href="#pricing">{t.getKey}</a>
+        <a className="signIn" href="/login">{t.signIn}</a>
+        <a className="headerCta" href="/login">{t.getKey}</a>
       </div>
     </header>
   );

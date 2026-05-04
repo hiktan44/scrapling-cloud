@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from .db import get_db
 from .models import ApiKey, Organization
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 bearer = HTTPBearer(auto_error=False)
 
 
@@ -22,6 +22,16 @@ def hash_api_key(raw_key: str) -> str:
 
 def create_api_key() -> str:
     return f"sk_{secrets.token_urlsafe(32)}"
+
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(password: str, password_hash: str | None) -> bool:
+    if not password_hash:
+        return False
+    return pwd_context.verify(password, password_hash)
 
 
 @dataclass

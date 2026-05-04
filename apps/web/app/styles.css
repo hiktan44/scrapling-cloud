@@ -39,6 +39,15 @@ input {
   font: inherit;
 }
 
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .siteHeader {
   position: sticky;
   top: 0;
@@ -708,6 +717,390 @@ pre {
   color: white;
 }
 
+.authShell,
+.dashboardShell {
+  min-height: 100vh;
+  background: var(--soft);
+}
+
+.authShell {
+  display: grid;
+  grid-template-columns: minmax(360px, 520px) minmax(0, 1fr);
+  gap: 32px;
+  padding: clamp(18px, 5vw, 72px);
+  align-items: center;
+}
+
+.authPanel,
+.authAside,
+.dashboardPanel,
+.dashboardMetric {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.authPanel {
+  display: grid;
+  gap: 24px;
+  padding: 34px;
+}
+
+.authPanel h1,
+.dashboardTop h1,
+.dashboardPanel h2 {
+  margin: 0;
+  line-height: 1.05;
+}
+
+.authPanel h1 {
+  font-size: 44px;
+}
+
+.authPanel p,
+.dashboardPanel p,
+.emptyState {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.authSwitch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfa;
+}
+
+.authSwitch button {
+  height: 42px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.authSwitch button.selected {
+  background: white;
+  color: var(--teal-dark);
+  box-shadow: 0 8px 20px rgba(18, 31, 29, 0.08);
+}
+
+.authForm {
+  display: grid;
+  gap: 16px;
+}
+
+.authForm label {
+  display: grid;
+  gap: 8px;
+  color: #354541;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.authForm label > span,
+.authForm input,
+.playgroundControls input {
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.authForm label > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  color: var(--teal-dark);
+}
+
+.authForm input,
+.playgroundControls input {
+  width: 100%;
+  min-width: 0;
+  padding: 0 14px;
+  color: var(--ink);
+}
+
+.authForm label > span input {
+  height: auto;
+  padding: 0;
+  border: 0;
+  outline: 0;
+}
+
+.authSubmit {
+  width: 100%;
+  border: 0;
+}
+
+.formError {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 107, 95, 0.35);
+  border-radius: 8px;
+  color: #9f2f27;
+  background: #fff1ef;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.demoBox {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 8px;
+  background: #eaf8f6;
+}
+
+.demoBox span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #2f4742;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.authAside {
+  min-height: 560px;
+  display: grid;
+  align-content: center;
+  gap: 18px;
+  padding: 34px;
+  background:
+    linear-gradient(135deg, rgba(15, 155, 142, 0.95), rgba(47, 112, 255, 0.92)),
+    #0f9b8e;
+  color: white;
+  overflow: hidden;
+}
+
+.authMetric {
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.authMetric span,
+.dashboardMetric span,
+.dashboardTop span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.authMetric span {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.authMetric strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 42px;
+}
+
+.authAside pre {
+  padding: 22px;
+  border-radius: 8px;
+  color: #dff8f4;
+  background: rgba(13, 23, 21, 0.88);
+}
+
+.dashboardShell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+
+.dashboardSidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: grid;
+  align-content: start;
+  gap: 30px;
+  padding: 28px;
+  border-right: 1px solid var(--line);
+  background: white;
+}
+
+.dashboardSidebar nav {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboardSidebar nav a {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: #42534f;
+  font-weight: 850;
+}
+
+.dashboardSidebar nav a:hover {
+  color: var(--teal-dark);
+  background: #eaf8f6;
+}
+
+.dashboardMain {
+  display: grid;
+  gap: 22px;
+  padding: 30px;
+}
+
+.dashboardTop,
+.panelHeader,
+.playgroundControls,
+.dashboardActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dashboardTop h1 {
+  margin-top: 6px;
+  font-size: 38px;
+}
+
+.dashboardActions .secondary,
+.panelHeader .secondary,
+.panelHeader .primary,
+.playgroundControls .primary,
+.newKeyBox button,
+.tableList button {
+  border: 0;
+}
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dashboardMetric {
+  padding: 22px;
+}
+
+.dashboardMetric strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 32px;
+}
+
+.dashboardPanel {
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+}
+
+.panelHeader h2 {
+  font-size: 26px;
+}
+
+.newKeyBox {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid rgba(15, 155, 142, 0.28);
+  border-radius: 8px;
+  background: #eaf8f6;
+}
+
+.newKeyBox code {
+  display: block;
+  max-width: 100%;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 8px;
+  background: white;
+  color: #143b36;
+  font-size: 13px;
+}
+
+.newKeyBox button,
+.tableList button {
+  width: fit-content;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--teal-dark);
+  background: white;
+  font-weight: 850;
+}
+
+.tableList {
+  display: grid;
+  gap: 10px;
+}
+
+.tableList article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.tableList article div {
+  min-width: 0;
+}
+
+.tableList strong,
+.tableList span {
+  display: block;
+}
+
+.tableList span {
+  margin-top: 4px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.playgroundControls input {
+  flex: 1;
+}
+
+.playgroundPanel pre {
+  min-height: 180px;
+  padding: 18px;
+  border-radius: 8px;
+}
+
+.dashboardError {
+  width: fit-content;
+}
+
+.loadingLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -743,6 +1136,12 @@ pre {
   }
   to {
     width: 72%;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -785,8 +1184,23 @@ pre {
 
   .featureGrid,
   .testimonialGrid,
-  .pricingGrid {
+  .pricingGrid,
+  .dashboardGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .authShell,
+  .dashboardShell {
+    grid-template-columns: 1fr;
+  }
+
+  .authAside {
+    min-height: auto;
+  }
+
+  .dashboardSidebar {
+    position: static;
+    height: auto;
   }
 }
 
@@ -831,8 +1245,34 @@ pre {
   .analyticsBoard,
   .testimonialGrid,
   .pricingGrid,
+  .dashboardGrid,
   .footer {
     grid-template-columns: 1fr;
+  }
+
+  .authShell,
+  .dashboardMain {
+    padding: 16px;
+  }
+
+  .authPanel,
+  .authAside,
+  .dashboardPanel {
+    padding: 18px;
+  }
+
+  .authPanel h1,
+  .dashboardTop h1 {
+    font-size: 32px;
+  }
+
+  .dashboardTop,
+  .panelHeader,
+  .playgroundControls,
+  .dashboardActions,
+  .tableList article {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .steps::before {
