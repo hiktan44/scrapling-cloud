@@ -45,6 +45,14 @@ type Job = {
   url: string | null;
 };
 
+type ProgressState = {
+  visible: boolean;
+  percent: number;
+  status: string;
+  message: string;
+  tone: "active" | "success" | "error";
+};
+
 export default function DashboardPage() {
   const [apiKey, setApiKey] = useState("");
   const [workspace, setWorkspace] = useState("Workspace");
@@ -57,6 +65,13 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [progress, setProgress] = useState<ProgressState>({
+    visible: false,
+    percent: 0,
+    status: "idle",
+    message: "Hazır",
+    tone: "active"
+  });
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }), [apiKey]);
 
@@ -144,19 +159,47 @@ export default function DashboardPage() {
     setWorking(true);
     setError("");
     setPlaygroundResult("");
+    setProgress({
+      visible: true,
+      percent: 8,
+      status: "preparing",
+      message: "URL hazırlanıyor",
+      tone: "active"
+    });
     try {
       const normalizedUrl = normalizeUrl(sampleUrl);
       setSampleUrl(normalizedUrl);
+      setProgress({
+        visible: true,
+        percent: 18,
+        status: "sending",
+        message: "Scrape job API'ye gönderiliyor",
+        tone: "active"
+      });
       const result = await apiFetch("/v1/scrape", {
         method: "POST",
         body: JSON.stringify({ url: normalizedUrl, formats: ["markdown", "links", "metadata"], mode: "auto" })
       });
       setPlaygroundResult(JSON.stringify(result, null, 2));
+      setProgress({
+        visible: true,
+        percent: 32,
+        status: "queued",
+        message: "Job kuyruğa alındı, worker bekleniyor",
+        tone: "active"
+      });
       if (typeof result === "object" && result && "id" in result) {
         await pollJob(String((result as Job).id));
       }
       await refresh();
     } catch (err) {
+      setProgress({
+        visible: true,
+        percent: 100,
+        status: "failed",
+        message: err instanceof Error ? err.message : "Scrape job gönderilemedi",
+        tone: "error"
+      });
       setError(err instanceof Error ? err.message : "Scrape job gönderilemedi");
     } finally {
       setWorking(false);
@@ -166,12 +209,44 @@ export default function DashboardPage() {
   async function pollJob(jobId: string) {
     for (let attempt = 0; attempt < 8; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 1800));
-      const job = await apiFetch(`/v1/jobs/${jobId}`);
+      const job = await apiFetch<Job & { result?: unknown; error?: string | null }>(`/v1/jobs/${jobId}`);
       setPlaygroundResult(JSON.stringify(job, null, 2));
-      if (typeof job === "object" && job && "status" in job && !["queued", "running"].includes(String((job as Job).status))) {
+      const status = String(job.status);
+      const percent = Math.min(88, 38 + attempt * 7);
+      setProgress({
+        visible: true,
+        percent: status === "succeeded" ? 100 : status === "failed" ? 100 : percent,
+        status,
+        message: progressMessage(status, attempt),
+        tone: status === "succeeded" ? "success" : status === "failed" ? "error" : "active"
+      });
+      if (!["queued", "running"].includes(status)) {
         return;
       }
     }
+    setProgress({
+      visible: true,
+      percent: 92,
+      status: "still-running",
+      message: "Job hala çalışıyor; Son işler bölümünden takip edebilirsin",
+      tone: "active"
+    });
+  }
+
+  function progressMessage(status: string, attempt: number) {
+    if (status === "queued") {
+      return "Kuyrukta, worker sıraya alıyor";
+    }
+    if (status === "running") {
+      return attempt < 3 ? "Sayfa çekiliyor ve içerik ayrıştırılıyor" : "Sonuç hazırlanıyor";
+    }
+    if (status === "succeeded") {
+      return "Tamamlandı, sonuç hazır";
+    }
+    if (status === "failed") {
+      return "Job hata aldı, detay aşağıdaki sonuçta";
+    }
+    return "Job durumu güncellendi";
   }
 
   function normalizeUrl(value: string) {
@@ -300,6 +375,17 @@ export default function DashboardPage() {
               Job gönder
             </button>
           </div>
+          {progress.visible && (
+            <div className={`progressCard ${progress.tone}`} role="status" aria-live="polite">
+              <div className="progressMeta">
+                <strong>{progress.message}</strong>
+                <span>{progress.status} · {progress.percent}%</span>
+              </div>
+              <div className="progressTrack" aria-label="Scrape progress">
+                <i style={{ width: `${progress.percent}%` }} />
+              </div>
+            </div>
+          )}
           <pre>{playgroundResult || "Sonuç burada görünecek."}</pre>
         </section>
 

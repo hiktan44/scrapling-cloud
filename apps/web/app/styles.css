@@ -1079,6 +1079,67 @@ pre {
   flex: 1;
 }
 
+.progressCard {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(15, 155, 142, 0.25);
+  border-radius: 8px;
+  background: #f4fbfa;
+}
+
+.progressCard.success {
+  border-color: rgba(24, 160, 88, 0.28);
+  background: #effaf4;
+}
+
+.progressCard.error {
+  border-color: rgba(255, 107, 95, 0.32);
+  background: #fff1ef;
+}
+
+.progressMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progressMeta strong {
+  color: #203631;
+}
+
+.progressMeta span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.progressTrack {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #d8e8e5;
+}
+
+.progressTrack i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--teal), var(--blue));
+  transition: width 420ms ease;
+}
+
+.progressCard.success .progressTrack i {
+  background: var(--green);
+}
+
+.progressCard.error .progressTrack i {
+  background: var(--coral);
+}
+
 .playgroundPanel pre {
   min-height: 180px;
   padding: 18px;
@@ -1270,9 +1331,14 @@ pre {
   .panelHeader,
   .playgroundControls,
   .dashboardActions,
+  .progressMeta,
   .tableList article {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .progressMeta span {
+    white-space: normal;
   }
 
   .steps::before {
