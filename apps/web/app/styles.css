@@ -1015,6 +1015,12 @@ pre {
     linear-gradient(135deg, #ffffff 0%, #eaf8f6 100%);
 }
 
+.dataLaunch {
+  background:
+    radial-gradient(circle at 92% 18%, rgba(133, 92, 248, 0.18), transparent 28%),
+    linear-gradient(135deg, #ffffff 0%, #f1eefc 100%);
+}
+
 .playgroundLaunch > div > span {
   display: block;
   color: var(--teal-dark);
@@ -1192,6 +1198,15 @@ pre {
   background:
     radial-gradient(circle at 12% 12%, rgba(15, 155, 142, 0.16), transparent 28%),
     radial-gradient(circle at 86% 8%, rgba(47, 112, 255, 0.16), transparent 24%),
+    #f6f9f8;
+}
+
+.dataShell {
+  min-height: 100vh;
+  padding: 24px clamp(18px, 4vw, 56px) 54px;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(133, 92, 248, 0.14), transparent 26%),
+    radial-gradient(circle at 88% 8%, rgba(24, 160, 88, 0.16), transparent 24%),
     #f6f9f8;
 }
 
@@ -1494,6 +1509,203 @@ pre {
   border-radius: 8px;
 }
 
+.dataHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: end;
+  gap: 24px;
+  padding: 46px 0 30px;
+}
+
+.dataHero h1 {
+  margin: 0;
+  font-size: clamp(44px, 7vw, 82px);
+  line-height: 0.96;
+}
+
+.dataHero p {
+  max-width: 780px;
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.dataHeroCard {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid rgba(133, 92, 248, 0.24);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.dataHeroCard svg {
+  color: var(--violet);
+}
+
+.dataHeroCard strong {
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.dataHeroCard span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.dataWorkspace {
+  display: grid;
+  grid-template-columns: minmax(340px, 0.72fr) minmax(0, 1.28fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.crawlControls,
+.dataResults {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.crawlControls {
+  position: sticky;
+  top: 18px;
+}
+
+.crawlControls label {
+  display: grid;
+  gap: 9px;
+  color: #243833;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.numberGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.numberGrid input {
+  height: 46px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #fbfdfc;
+  color: var(--ink);
+}
+
+.crawlButton {
+  width: 100%;
+  border: 0;
+}
+
+.dataResults .statusStrip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dataToolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.searchBox {
+  flex: 1;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #fbfdfc;
+  color: var(--teal-dark);
+}
+
+.searchBox input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.pageList {
+  display: grid;
+  gap: 14px;
+}
+
+.emptyData {
+  padding: 22px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #fbfdfc;
+  font-weight: 800;
+}
+
+.pageResult {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.pageResultTop,
+.pageMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pageResultTop span,
+.pageMeta span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.pageResultTop a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--teal-dark);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pageResult h2 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.pageResult p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.pageResult pre {
+  max-height: 360px;
+  padding: 16px;
+  border-radius: 8px;
+  color: #dff8f4;
+}
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -1585,7 +1797,9 @@ pre {
   .authShell,
   .dashboardShell,
   .playgroundWorkspace,
-  .playgroundHero {
+  .playgroundHero,
+  .dataWorkspace,
+  .dataHero {
     grid-template-columns: 1fr;
   }
 
@@ -1598,7 +1812,8 @@ pre {
     height: auto;
   }
 
-  .requestStudio {
+  .requestStudio,
+  .crawlControls {
     position: static;
   }
 }
@@ -1651,7 +1866,8 @@ pre {
 
   .authShell,
   .dashboardMain,
-  .playgroundShell {
+  .playgroundShell,
+  .dataShell {
     padding: 16px;
   }
 
@@ -1672,6 +1888,9 @@ pre {
   .playgroundTopbar,
   .studioActions,
   .consoleHeader,
+  .dataToolbar,
+  .pageResultTop,
+  .pageMeta,
   .dashboardActions,
   .progressMeta,
   .tableList article {
@@ -1685,6 +1904,8 @@ pre {
 
   .playgroundTopbar nav,
   .statusStrip,
+  .dataResults .statusStrip,
+  .numberGrid,
   .formatGrid {
     grid-template-columns: 1fr;
     display: grid;

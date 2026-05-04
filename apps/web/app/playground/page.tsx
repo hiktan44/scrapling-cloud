@@ -203,6 +203,7 @@ export default function PlaygroundPage() {
         </Link>
         <nav>
           <Link href="/dashboard"><Home size={18} /> Dashboard</Link>
+          <Link href="/data"><DatabaseZap size={18} /> Data Explorer</Link>
           <a href={`${apiUrl}/docs`} target="_blank"><BookOpenText size={18} /> API Docs</a>
         </nav>
       </header>

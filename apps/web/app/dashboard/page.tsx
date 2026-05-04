@@ -5,6 +5,7 @@ import {
   ArrowRight,
   BookOpenText,
   Copy,
+  DatabaseZap,
   KeyRound,
   Loader2,
   LogOut,
@@ -154,6 +155,7 @@ export default function DashboardPage() {
           <a href="#overview"><Activity size={18} /> Genel bakış</a>
           <a href="#keys"><KeyRound size={18} /> API key</a>
           <Link href="/playground"><ArrowRight size={18} /> Playground</Link>
+          <Link href="/data"><DatabaseZap size={18} /> Data Explorer</Link>
           <a href={`${apiUrl}/docs`} target="_blank"><BookOpenText size={18} /> Docs</a>
         </nav>
       </aside>
@@ -230,6 +232,18 @@ export default function DashboardPage() {
           </div>
           <Link className="primary" href="/playground">
             Playground’u aç
+            <ArrowRight size={18} />
+          </Link>
+        </section>
+
+        <section className="dashboardPanel playgroundLaunch dataLaunch">
+          <div>
+            <span>Derin veri çıkarımı</span>
+            <h2>Data Explorer ile tüm sayfaları tara</h2>
+            <p>Başlangıç URL’sinden aynı domain içinde derinlere in, sayfa metinlerini ve linkleri okunabilir kartlarda gör.</p>
+          </div>
+          <Link className="primary" href="/data">
+            Data Explorer’ı aç
             <ArrowRight size={18} />
           </Link>
         </section>

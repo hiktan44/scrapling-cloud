@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections import deque
+from urllib.parse import urldefrag, urljoin, urlparse
+
 from bs4 import BeautifulSoup
 from markdownify import markdownify as to_markdown
 
@@ -8,10 +11,37 @@ def _extract_links(html: str, base_url: str) -> list[str]:
     soup = BeautifulSoup(html, "html.parser")
     links: list[str] = []
     for anchor in soup.find_all("a", href=True):
-        href = anchor.get("href")
+        href = normalize_link(anchor.get("href"), base_url)
         if href and href not in links:
             links.append(href)
     return links[:500]
+
+
+def normalize_link(href: str | None, base_url: str) -> str | None:
+    if not href:
+        return None
+    raw = href.strip()
+    if not raw or raw.startswith(("#", "mailto:", "tel:", "javascript:")):
+        return None
+    absolute, _fragment = urldefrag(urljoin(base_url, raw))
+    parsed = urlparse(absolute)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return absolute
+
+
+def same_site(url: str, root_url: str) -> bool:
+    url_host = urlparse(url).netloc.lower().removeprefix("www.")
+    root_host = urlparse(root_url).netloc.lower().removeprefix("www.")
+    return url_host == root_host
+
+
+def allowed_by_patterns(url: str, include: list[str], exclude: list[str]) -> bool:
+    if include and not any(pattern in url for pattern in include):
+        return False
+    if exclude and any(pattern in url for pattern in exclude):
+        return False
+    return True
 
 
 def _metadata(html: str) -> dict:
@@ -97,10 +127,57 @@ async def map_url(payload: dict) -> dict:
 
 
 async def crawl_url(payload: dict) -> dict:
-    mapped = await map_url({"url": payload["url"], "limit": payload.get("limit", 25)})
+    root_url = str(payload["url"])
+    limit = int(payload.get("limit", 25))
+    max_depth = int(payload.get("max_depth", 2))
+    formats = payload.get("formats") or ["markdown", "links", "metadata"]
+    mode = payload.get("mode", "static")
+    include = payload.get("include") or []
+    exclude = payload.get("exclude") or []
+
+    queue = deque([(root_url, 0)])
+    seen: set[str] = set()
+    pages: list[dict] = []
+    discovered: list[str] = []
+    errors: list[dict] = []
+
+    while queue and len(pages) < limit:
+        current_url, depth = queue.popleft()
+        if current_url in seen:
+            continue
+        seen.add(current_url)
+        if not same_site(current_url, root_url) or not allowed_by_patterns(current_url, include, exclude):
+            continue
+
+        try:
+            scraped = await scrape_url({"url": current_url, "formats": formats, "mode": mode})
+            page_links = [link for link in scraped.get("links", []) if same_site(link, root_url)]
+            page = {
+                "url": current_url,
+                "depth": depth,
+                "title": (scraped.get("metadata") or {}).get("title"),
+                "description": (scraped.get("metadata") or {}).get("description"),
+                "markdown": scraped.get("markdown"),
+                "text": scraped.get("text"),
+                "links": page_links,
+                "metadata": scraped.get("metadata"),
+            }
+            pages.append(page)
+            for link in page_links:
+                if link not in discovered:
+                    discovered.append(link)
+                if depth < max_depth and link not in seen and len(seen) + len(queue) < max(limit * 4, limit):
+                    queue.append((link, depth + 1))
+        except Exception as exc:
+            errors.append({"url": current_url, "depth": depth, "error": str(exc)})
+
     return {
-        "url": str(payload["url"]),
-        "max_depth": payload.get("max_depth", 2),
-        "queued": mapped["links"][: payload.get("limit", 25)],
-        "note": "Initial version discovers links and records an async crawl job; recursive worker expansion is ready to extend.",
+        "url": root_url,
+        "max_depth": max_depth,
+        "limit": limit,
+        "pages_scraped": len(pages),
+        "links_discovered": len(discovered),
+        "pages": pages,
+        "discovered": discovered[: max(limit * 3, 50)],
+        "errors": errors,
     }

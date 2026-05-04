@@ -25,6 +25,7 @@ class CrawlRequest(BaseModel):
     max_depth: int = Field(default=2, ge=0, le=10)
     include: list[str] = Field(default_factory=list)
     exclude: list[str] = Field(default_factory=list)
+    formats: list[Format] = Field(default_factory=lambda: ["markdown", "links", "metadata"])
     mode: Mode = "auto"
     webhook_url: HttpUrl | None = None
 
