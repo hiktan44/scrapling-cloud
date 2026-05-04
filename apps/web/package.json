@@ -1,0 +1,27 @@
+{
+  "name": "scrapling-cloud-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
+    "start:standalone": "mkdir -p .next/standalone/.next && cp -R .next/static .next/standalone/.next/static && node .next/standalone/server.js",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@types/node": "20.14.10",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "lucide-react": "1.14.0",
+    "next": "16.2.4",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "typescript": "5.5.3"
+  },
+  "devDependencies": {
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.4",
+    "playwright": "^1.59.1"
+  }
+}
