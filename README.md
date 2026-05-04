@@ -59,6 +59,16 @@ curl -X POST http://localhost:8000/v1/scrape \
   -d '{"url":"https://example.com","formats":["markdown","links"]}'
 ```
 
+## Production Target
+
+The prepared Coolify/self-host target is:
+
+- Web: `https://www.seymata.com`
+- API: `https://api.seymata.com`
+
+Use `.env.production.example` as the Coolify environment template and follow
+`coolify.md` for DNS, domain and Stripe webhook setup.
+
 ## License Attribution
 
 Scrapling is licensed under BSD-3-Clause. Keep the upstream license notice when
