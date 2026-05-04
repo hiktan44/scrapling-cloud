@@ -236,10 +236,11 @@ const pricing = {
 export default function Home() {
   const [locale, setLocale] = useState<Locale>("tr");
   const t = copy[locale];
+  const publicApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
   return (
     <main>
-      <Header locale={locale} setLocale={setLocale} />
+      <Header locale={locale} setLocale={setLocale} apiUrl={publicApiUrl} />
       <section className="hero">
         <div className="heroCopy">
           <h1>{t.heroTitle}</h1>
@@ -356,7 +357,7 @@ ${t.codeStatus}
         <div className="apiCopy">
           <h2>{t.docsTitle}</h2>
           <p>{t.docsText}</p>
-          <a className="secondary" href="http://localhost:8000/docs">
+          <a className="secondary" href={`${publicApiUrl}/docs`}>
             {t.openDocs}
             <ArrowRight size={18} />
           </a>
@@ -367,7 +368,7 @@ ${t.codeStatus}
             <span>TypeScript</span>
             <span>Python</span>
           </div>
-          <pre>{`curl -X POST http://localhost:8000/v1/scrape \\
+          <pre>{`curl -X POST ${publicApiUrl}/v1/scrape \\
   -H "Authorization: Bearer sk_demo_local_development_key" \\
   -H "Content-Type: application/json" \\
   -d '{"url":"https://example.com","formats":["markdown","links"]}'`}</pre>
@@ -411,12 +412,12 @@ ${t.codeStatus}
         </div>
       </section>
 
-      <Footer locale={locale} />
+      <Footer locale={locale} apiUrl={publicApiUrl} />
     </main>
   );
 }
 
-function Header({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
+function Header({ locale, setLocale, apiUrl }: { locale: Locale; setLocale: (locale: Locale) => void; apiUrl: string }) {
   const t = copy[locale];
   return (
     <header className="siteHeader">
@@ -428,7 +429,7 @@ function Header({ locale, setLocale }: { locale: Locale; setLocale: (locale: Loc
         <a href="#features">{t.nav[0]}</a>
         <a href="#api">{t.nav[1]}</a>
         <a href="#pricing">{t.nav[2]}</a>
-        <a href="http://localhost:8000/docs">{t.nav[3]}</a>
+        <a href={`${apiUrl}/docs`}>{t.nav[3]}</a>
       </nav>
       <div className="headerActions">
         <div className="languageSwitch" aria-label="Language selector">
@@ -464,7 +465,7 @@ function MiniChart({ large = false }: { large?: boolean }) {
   );
 }
 
-function Footer({ locale }: { locale: Locale }) {
+function Footer({ locale, apiUrl }: { locale: Locale; apiUrl: string }) {
   const t = copy[locale];
   return (
     <footer className="footer">
@@ -481,7 +482,7 @@ function Footer({ locale }: { locale: Locale }) {
       <div>
         <strong>{t.footerDevelopers}</strong>
         <a href="#api">{locale === "tr" ? "API dokümanları" : "API docs"}</a>
-        <a href="http://localhost:8000/docs">OpenAPI</a>
+        <a href={`${apiUrl}/docs`}>OpenAPI</a>
         <a href="#features">SDKs</a>
       </div>
       <div>
