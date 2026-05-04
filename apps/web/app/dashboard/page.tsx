@@ -52,7 +52,7 @@ export default function DashboardPage() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [newKey, setNewKey] = useState("");
-  const [sampleUrl, setSampleUrl] = useState("https://example.com");
+  const [sampleUrl, setSampleUrl] = useState("https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/home");
   const [playgroundResult, setPlaygroundResult] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -145,17 +145,51 @@ export default function DashboardPage() {
     setError("");
     setPlaygroundResult("");
     try {
+      const normalizedUrl = normalizeUrl(sampleUrl);
+      setSampleUrl(normalizedUrl);
       const result = await apiFetch("/v1/scrape", {
         method: "POST",
-        body: JSON.stringify({ url: sampleUrl, formats: ["markdown", "links"], mode: "auto" })
+        body: JSON.stringify({ url: normalizedUrl, formats: ["markdown", "links", "metadata"], mode: "auto" })
       });
       setPlaygroundResult(JSON.stringify(result, null, 2));
+      if (typeof result === "object" && result && "id" in result) {
+        await pollJob(String((result as Job).id));
+      }
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scrape job gönderilemedi");
     } finally {
       setWorking(false);
     }
+  }
+
+  async function pollJob(jobId: string) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+      const job = await apiFetch(`/v1/jobs/${jobId}`);
+      setPlaygroundResult(JSON.stringify(job, null, 2));
+      if (typeof job === "object" && job && "status" in job && !["queued", "running"].includes(String((job as Job).status))) {
+        return;
+      }
+    }
+  }
+
+  function normalizeUrl(value: string) {
+    let url = value.trim();
+    url = url.replace(/^https\/\//, "https://").replace(/^http\/\//, "http://");
+    const embeddedProtocol = url.slice(8).search(/https?:\/\/|https\/\//);
+    if (embeddedProtocol >= 0) {
+      url = url.slice(8 + embeddedProtocol).replace(/^https\/\//, "https://").replace(/^http\/\//, "http://");
+    }
+    if (!/^https?:\/\//.test(url)) {
+      throw new Error("Lütfen URL'yi https:// ile birlikte gir.");
+    }
+    try {
+      new URL(url);
+    } catch {
+      throw new Error("URL formatı geçerli değil. Örnek: https://example.com");
+    }
+    return url;
   }
 
   function logout() {
@@ -255,7 +289,12 @@ export default function DashboardPage() {
             </a>
           </div>
           <div className="playgroundControls">
-            <input value={sampleUrl} onChange={(event) => setSampleUrl(event.target.value)} />
+            <input
+              value={sampleUrl}
+              onChange={(event) => setSampleUrl(event.target.value)}
+              onFocus={(event) => event.currentTarget.select()}
+              placeholder="https://example.com"
+            />
             <button className="primary" onClick={runScrape} disabled={working}>
               {working ? <Loader2 className="spin" size={18} /> : <ArrowRight size={18} />}
               Job gönder
