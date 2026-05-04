@@ -27,11 +27,18 @@ services:
   api:
     build:
       context: ./apps/api
-    env_file:
-      - .env
     environment:
+      APP_NAME: ${APP_NAME:-Scrapling Cloud}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      API_URL: ${API_URL:-http://localhost:8000}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://scrapling:scrapling@postgres:5432/scrapling_cloud}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      PROXY_PROVIDER_URL: ${PROXY_PROVIDER_URL:-}
+      PROXY_PROVIDER_TOKEN: ${PROXY_PROVIDER_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -49,11 +56,18 @@ services:
     build:
       context: ./apps/api
     command: ["python", "-m", "scrapling_cloud.worker"]
-    env_file:
-      - .env
     environment:
+      APP_NAME: ${APP_NAME:-Scrapling Cloud}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      API_URL: ${API_URL:-http://localhost:8000}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://scrapling:scrapling@postgres:5432/scrapling_cloud}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      PROXY_PROVIDER_URL: ${PROXY_PROVIDER_URL:-}
+      PROXY_PROVIDER_TOKEN: ${PROXY_PROVIDER_TOKEN:-}
     depends_on:
       api:
         condition: service_healthy
@@ -61,8 +75,6 @@ services:
   web:
     build:
       context: ./apps/web
-    env_file:
-      - .env
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     depends_on:
