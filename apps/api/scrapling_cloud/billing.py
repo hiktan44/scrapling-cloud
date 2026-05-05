@@ -25,6 +25,8 @@ def estimate_credits(kind: str, payload: dict) -> int:
         credits += 3
     if payload.get("schema"):
         credits += 3
+    if payload.get("ai_extract"):
+        credits += 3
     if kind == JobKind.crawl.value:
         credits += max(1, int(payload.get("limit", 25)) // 10)
     if kind == JobKind.batch.value:

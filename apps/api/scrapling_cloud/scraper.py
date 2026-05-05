@@ -6,6 +6,8 @@ from urllib.parse import urldefrag, urljoin, urlparse
 from bs4 import BeautifulSoup
 from markdownify import markdownify as to_markdown
 
+from .analyzer import analyze_crawl
+
 
 def _extract_links(html: str, base_url: str) -> list[str]:
     soup = BeautifulSoup(html, "html.parser")
@@ -171,12 +173,17 @@ async def crawl_url(payload: dict) -> dict:
         except Exception as exc:
             errors.append({"url": current_url, "depth": depth, "error": str(exc)})
 
+    ai = None
+    if payload.get("ai_extract", True):
+        ai = await analyze_crawl(pages, root_url, payload.get("analysis_prompt"))
+
     return {
         "url": root_url,
         "max_depth": max_depth,
         "limit": limit,
         "pages_scraped": len(pages),
         "links_discovered": len(discovered),
+        "ai": ai,
         "pages": pages,
         "discovered": discovered[: max(limit * 3, 50)],
         "errors": errors,

@@ -27,6 +27,8 @@ class CrawlRequest(BaseModel):
     exclude: list[str] = Field(default_factory=list)
     formats: list[Format] = Field(default_factory=lambda: ["markdown", "links", "metadata"])
     mode: Mode = "auto"
+    ai_extract: bool = True
+    analysis_prompt: str | None = None
     webhook_url: HttpUrl | None = None
 
 

@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     encryption_key: str = "change-me"
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-5.4-mini"
     proxy_provider_url: str | None = None
     proxy_provider_token: str | None = None
     demo_api_key: str = Field(default="sk_demo_local_development_key")

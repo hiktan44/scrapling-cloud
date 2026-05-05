@@ -35,12 +35,25 @@ type CrawlPage = {
   links?: string[];
 };
 
+type AiAnalysis = {
+  enabled?: boolean;
+  provider?: string;
+  reason?: string;
+  summary?: string;
+  key_points?: string[];
+  opportunities?: Array<string | Record<string, unknown>>;
+  entities?: Array<string | Record<string, unknown>>;
+  recommended_actions?: string[];
+  page_summaries?: Array<{ title?: string; url?: string; summary?: string; important_items?: string[] }>;
+};
+
 type CrawlResult = {
   url: string;
   max_depth: number;
   limit: number;
   pages_scraped: number;
   links_discovered: number;
+  ai?: AiAnalysis | null;
   pages: CrawlPage[];
   discovered: string[];
   errors: Array<{ url: string; error: string }>;
@@ -70,6 +83,7 @@ export default function DataExplorerPage() {
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }), [apiKey]);
   const result = job?.result ?? null;
+  const ai = result?.ai ?? null;
   const pages = useMemo(() => {
     const all = result?.pages ?? [];
     const needle = query.trim().toLowerCase();
@@ -113,6 +127,8 @@ export default function DataExplorerPage() {
           limit,
           max_depth: maxDepth,
           mode,
+          ai_extract: true,
+          analysis_prompt: "Bu siteyi kullanıcı için anlamlı hale getir. Özet, önemli noktalar, fırsatlar, kurum/konu varlıkları ve sonraki aksiyonları Türkçe çıkar.",
           formats: ["markdown", "links", "metadata", "text"]
         })
       });
@@ -232,6 +248,43 @@ export default function DataExplorerPage() {
             </div>
           )}
 
+          {ai && (
+            <section className={ai.enabled ? "aiSummary" : "aiSummary fallback"}>
+              <div className="aiSummaryHead">
+                <div>
+                  <span>AI Summary</span>
+                  <h2>{ai.enabled ? "LLM analizi hazır" : "LLM fallback özeti"}</h2>
+                </div>
+                <strong>{ai.provider ?? "analysis"}</strong>
+              </div>
+              <p>{ai.summary}</p>
+              {ai.reason && <small>{ai.reason}</small>}
+              <div className="aiGrid">
+                <AiList title="Önemli noktalar" items={ai.key_points} />
+                <AiList title="Önerilen aksiyonlar" items={ai.recommended_actions} />
+              </div>
+              {ai.opportunities && ai.opportunities.length > 0 && (
+                <div className="aiBlock">
+                  <strong>Fırsatlar / ihale sinyalleri</strong>
+                  <ul>
+                    {ai.opportunities.slice(0, 8).map((item, index) => <li key={index}>{formatAiItem(item)}</li>)}
+                  </ul>
+                </div>
+              )}
+              {ai.page_summaries && ai.page_summaries.length > 0 && (
+                <div className="aiPages">
+                  {ai.page_summaries.slice(0, 8).map((page, index) => (
+                    <article key={`${page.url}-${index}`}>
+                      <strong>{page.title || "Sayfa özeti"}</strong>
+                      <p>{page.summary}</p>
+                      {page.url && <a href={page.url} target="_blank">{page.url}</a>}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           <div className="dataToolbar">
             <div className="searchBox">
               <Search size={18} />
@@ -275,6 +328,27 @@ function StatusTile({ icon: Icon, title, value }: { icon: typeof Gauge; title: s
       <strong>{value}</strong>
     </article>
   );
+}
+
+function AiList({ title, items }: { title: string; items?: string[] }) {
+  if (!items || items.length === 0) {
+    return null;
+  }
+  return (
+    <div className="aiBlock">
+      <strong>{title}</strong>
+      <ul>
+        {items.slice(0, 8).map((item) => <li key={item}>{item}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+function formatAiItem(item: string | Record<string, unknown>) {
+  if (typeof item === "string") {
+    return item;
+  }
+  return Object.entries(item).map(([key, value]) => `${key}: ${String(value)}`).join(" · ");
 }
 
 function trimText(value: string) {

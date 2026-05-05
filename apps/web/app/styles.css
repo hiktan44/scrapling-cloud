@@ -1618,6 +1618,116 @@ pre {
   align-items: center;
 }
 
+.aiSummary {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid rgba(133, 92, 248, 0.28);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 96% 0%, rgba(133, 92, 248, 0.14), transparent 28%),
+    #ffffff;
+}
+
+.aiSummary.fallback {
+  border-color: rgba(255, 176, 32, 0.34);
+  background:
+    radial-gradient(circle at 96% 0%, rgba(255, 176, 32, 0.14), transparent 28%),
+    #ffffff;
+}
+
+.aiSummaryHead {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.aiSummaryHead span {
+  color: var(--violet);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.aiSummaryHead h2 {
+  margin: 6px 0 0;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.aiSummaryHead strong {
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--violet);
+  background: #f1eefc;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.aiSummary > p {
+  margin: 0;
+  color: #31423e;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.aiSummary small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.aiGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.aiBlock {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.aiBlock ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: #3b4d49;
+  line-height: 1.5;
+}
+
+.aiPages {
+  display: grid;
+  gap: 10px;
+}
+
+.aiPages article {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.aiPages p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.aiPages a {
+  color: var(--teal-dark);
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .searchBox {
   flex: 1;
   height: 46px;
@@ -1889,6 +1999,7 @@ pre {
   .studioActions,
   .consoleHeader,
   .dataToolbar,
+  .aiSummaryHead,
   .pageResultTop,
   .pageMeta,
   .dashboardActions,
@@ -1905,6 +2016,7 @@ pre {
   .playgroundTopbar nav,
   .statusStrip,
   .dataResults .statusStrip,
+  .aiGrid,
   .numberGrid,
   .formatGrid {
     grid-template-columns: 1fr;
