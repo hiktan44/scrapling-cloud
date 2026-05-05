@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     openai_api_key: str | None = None
     openai_model: str = "gpt-5.4-mini"
+    llm_provider: str = "zai"
+    z_ai_api_key: str | None = None
+    zai_api_key: str | None = None
+    zai_base_url: str = "https://api.z.ai/api/paas/v4"
+    zai_model: str = "glm-5.1"
     proxy_provider_url: str | None = None
     proxy_provider_token: str | None = None
     demo_api_key: str = Field(default="sk_demo_local_development_key")

@@ -39,6 +39,11 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.4-mini}
+      LLM_PROVIDER: ${LLM_PROVIDER:-zai}
+      Z_AI_API_KEY: ${Z_AI_API_KEY:-}
+      ZAI_API_KEY: ${ZAI_API_KEY:-}
+      ZAI_BASE_URL: ${ZAI_BASE_URL:-https://api.z.ai/api/paas/v4}
+      ZAI_MODEL: ${ZAI_MODEL:-glm-5.1}
       PROXY_PROVIDER_URL: ${PROXY_PROVIDER_URL:-}
       PROXY_PROVIDER_TOKEN: ${PROXY_PROVIDER_TOKEN:-}
     depends_on:
@@ -70,6 +75,11 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.4-mini}
+      LLM_PROVIDER: ${LLM_PROVIDER:-zai}
+      Z_AI_API_KEY: ${Z_AI_API_KEY:-}
+      ZAI_API_KEY: ${ZAI_API_KEY:-}
+      ZAI_BASE_URL: ${ZAI_BASE_URL:-https://api.z.ai/api/paas/v4}
+      ZAI_MODEL: ${ZAI_MODEL:-glm-5.1}
       PROXY_PROVIDER_URL: ${PROXY_PROVIDER_URL:-}
       PROXY_PROVIDER_TOKEN: ${PROXY_PROVIDER_TOKEN:-}
     depends_on:
