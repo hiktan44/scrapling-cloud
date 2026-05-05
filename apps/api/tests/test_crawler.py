@@ -19,3 +19,14 @@ async def test_crawl_follows_same_site_links(monkeypatch) -> None:
     assert result["pages_scraped"] == 2
     assert [page["url"] for page in result["pages"]] == ["https://example.com/start", "https://example.com/next"]
     assert "https://other.test/out" not in result["discovered"]
+
+
+def test_extract_record_from_topic_url() -> None:
+    record = scraper.extract_record_from_url(
+        "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/digital-2025-ai-continuum"
+    )
+
+    assert record is not None
+    assert record["title"] == "Digital AI Continuum"
+    assert record["program"] == "Digital Europe"
+    assert record["years"] == ["2025"]

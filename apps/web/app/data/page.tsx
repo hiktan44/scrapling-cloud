@@ -35,6 +35,18 @@ type CrawlPage = {
   links?: string[];
 };
 
+type CrawlRecord = {
+  id: string;
+  title: string;
+  url: string;
+  type?: string;
+  program?: string | null;
+  years?: string[];
+  keywords?: string[];
+  summary?: string;
+  action?: string;
+};
+
 type AiAnalysis = {
   enabled?: boolean;
   provider?: string;
@@ -54,6 +66,8 @@ type CrawlResult = {
   limit: number;
   pages_scraped: number;
   links_discovered: number;
+  record_count?: number;
+  records?: CrawlRecord[];
   ai?: AiAnalysis | null;
   pages: CrawlPage[];
   discovered: string[];
@@ -88,6 +102,7 @@ export default function DataExplorerPage() {
   const headers = useMemo(() => ({ Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }), [apiKey]);
   const result = job?.result ?? null;
   const ai = result?.ai ?? null;
+  const records = result?.records ?? [];
   const pages = useMemo(() => {
     const all = result?.pages ?? [];
     const needle = query.trim().toLowerCase();
@@ -245,7 +260,7 @@ export default function DataExplorerPage() {
           <div className="statusStrip">
             <StatusTile icon={Gauge} title="Durum" value={job?.status ?? progress.status} />
             <StatusTile icon={FileText} title="Sayfa" value={String(result?.pages_scraped ?? 0)} />
-            <StatusTile icon={LinkIcon} title="Link" value={String(result?.links_discovered ?? 0)} />
+            <StatusTile icon={LinkIcon} title="Kayıt" value={String(result?.record_count ?? records.length)} />
             <StatusTile icon={DatabaseZap} title="Kredi" value={String(job?.credits ?? 0)} />
           </div>
 
@@ -314,6 +329,39 @@ export default function DataExplorerPage() {
               Yenile
             </button>
           </div>
+
+          {records.length > 0 && (
+            <section className="recordsPanel">
+              <div className="recordsHead">
+                <div>
+                  <span>Çıkarılan kayıtlar</span>
+                  <h2>{records.length} anlamlı kayıt bulundu</h2>
+                </div>
+                <strong>Topic / fırsat listesi</strong>
+              </div>
+              <div className="recordGrid">
+                {records.slice(0, 40).map((record) => (
+                  <article className="recordCard" key={record.id}>
+                    <div className="recordTop">
+                      <span>{record.program || record.type || "Kayıt"}</span>
+                      {record.years && record.years.length > 0 && <strong>{record.years.join(", ")}</strong>}
+                    </div>
+                    <h3>{record.title}</h3>
+                    <p>{record.summary}</p>
+                    {record.keywords && record.keywords.length > 0 && (
+                      <div className="keywordRow">
+                        {record.keywords.slice(0, 6).map((keyword) => <span key={keyword}>{keyword}</span>)}
+                      </div>
+                    )}
+                    <div className="recordAction">
+                      <span>{record.action}</span>
+                      <a href={record.url} target="_blank">Kaynağı aç</a>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
 
           <div className="pageList">
             {!result && <div className="emptyData">Henüz veri yok. Soldan bir crawl başlatınca sayfalar burada listelenir.</div>}

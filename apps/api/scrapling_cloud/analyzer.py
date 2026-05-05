@@ -20,7 +20,8 @@ def compact_page(page: dict, max_chars: int = 3500) -> dict:
     }
 
 
-def fallback_analysis(pages: list[dict], reason: str, instruction: str | None = None) -> dict:
+def fallback_analysis(pages: list[dict], reason: str, instruction: str | None = None, records: list[dict] | None = None) -> dict:
+    records = records or []
     page_summaries = []
     for page in pages[:12]:
         text = str(page.get("markdown") or page.get("text") or "").replace("\n", " ").strip()
@@ -34,6 +35,7 @@ def fallback_analysis(pages: list[dict], reason: str, instruction: str | None = 
         )
 
     titles = [page.get("title") for page in pages if page.get("title")]
+    record_titles = [record.get("title") for record in records if record.get("title")]
     return {
         "enabled": False,
         "provider": "fallback",
@@ -43,8 +45,17 @@ def fallback_analysis(pages: list[dict], reason: str, instruction: str | None = 
             "LLM anahtarı yapılandırılmadığı için otomatik yapısal özet üretildi. "
             "Z.ai/OpenAI anahtarı eklenince sonuç kullanıcının verdiği prompt isteğine göre üretilecek."
         ),
-        "key_points": titles[:6] or ["Sayfalar scrape edildi, fakat anlamlı başlık sayısı sınırlı."],
-        "opportunities": [],
+        "key_points": record_titles[:8] or titles[:6] or ["Sayfalar scrape edildi, fakat anlamlı başlık sayısı sınırlı."],
+        "opportunities": [
+            {
+                "title": record.get("title"),
+                "program": record.get("program"),
+                "years": record.get("years"),
+                "url": record.get("url"),
+                "action": record.get("action"),
+            }
+            for record in records[:20]
+        ],
         "entities": [],
         "recommended_actions": ["Z_AI_API_KEY env değerini ekle", "Crawl sonucunu tekrar çalıştır", "Gerekirse dynamic mode ile daha zengin içerik çek"],
         "page_summaries": page_summaries,
@@ -135,17 +146,18 @@ async def call_openai_responses(system: str, corpus: dict[str, Any]) -> dict:
     return parsed
 
 
-async def analyze_crawl(pages: list[dict], root_url: str, instruction: str | None = None) -> dict:
+async def analyze_crawl(pages: list[dict], root_url: str, instruction: str | None = None, records: list[dict] | None = None) -> dict:
     settings = get_settings()
     provider = settings.llm_provider.lower()
     if provider == "zai" and not z_ai_key():
-        return fallback_analysis(pages, "Z_AI_API_KEY is not configured", instruction)
+        return fallback_analysis(pages, "Z_AI_API_KEY is not configured", instruction, records)
     if provider == "openai" and not settings.openai_api_key:
-        return fallback_analysis(pages, "OPENAI_API_KEY is not configured", instruction)
+        return fallback_analysis(pages, "OPENAI_API_KEY is not configured", instruction, records)
 
     corpus = {
         "root_url": root_url,
         "pages": [compact_page(page) for page in pages[:20]],
+        "records": (records or [])[:80],
         "instruction": instruction or "Site içeriğini Türkçe olarak anlamlandır. Fırsat, ihale, başvuru, önemli tarih, doküman ve aksiyonları çıkar.",
     }
     system = (
@@ -159,11 +171,11 @@ async def analyze_crawl(pages: list[dict], root_url: str, instruction: str | Non
         elif provider == "openai":
             parsed = await call_openai_responses(system, corpus)
         else:
-            return fallback_analysis(pages, f"Unsupported LLM_PROVIDER: {settings.llm_provider}", instruction)
+            return fallback_analysis(pages, f"Unsupported LLM_PROVIDER: {settings.llm_provider}", instruction, records)
         parsed["prompt"] = instruction
         return parsed
     except Exception as exc:
-        fallback = fallback_analysis(pages, f"LLM analysis failed: {exc}", instruction)
+        fallback = fallback_analysis(pages, f"LLM analysis failed: {exc}", instruction, records)
         fallback["enabled"] = False
         fallback["provider"] = "fallback_after_error"
         return fallback

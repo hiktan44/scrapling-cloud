@@ -1631,6 +1631,108 @@ pre {
   align-items: center;
 }
 
+.recordsPanel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(15, 155, 142, 0.28);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 96% 0%, rgba(15, 155, 142, 0.14), transparent 28%),
+    #ffffff;
+}
+
+.recordsHead,
+.recordTop,
+.recordAction {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recordsHead span,
+.recordTop span {
+  color: var(--teal-dark);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.recordsHead h2 {
+  margin: 6px 0 0;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.recordsHead > strong {
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--teal-dark);
+  background: #e8f7f5;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.recordGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.recordCard {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.recordTop strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.recordCard h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.recordCard p,
+.recordAction span {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.keywordRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.keywordRow span {
+  padding: 5px 8px;
+  border-radius: 8px;
+  color: #31524d;
+  background: #e8f7f5;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.recordAction {
+  align-items: center;
+}
+
+.recordAction a {
+  flex: 0 0 auto;
+  color: var(--teal-dark);
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .aiSummary {
   display: grid;
   gap: 16px;
@@ -2033,6 +2135,9 @@ pre {
   .consoleHeader,
   .dataToolbar,
   .aiSummaryHead,
+  .recordsHead,
+  .recordTop,
+  .recordAction,
   .pageResultTop,
   .pageMeta,
   .dashboardActions,
@@ -2050,6 +2155,7 @@ pre {
   .statusStrip,
   .dataResults .statusStrip,
   .aiGrid,
+  .recordGrid,
   .numberGrid,
   .formatGrid {
     grid-template-columns: 1fr;

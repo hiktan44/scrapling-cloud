@@ -1,12 +1,26 @@
 from __future__ import annotations
 
 from collections import deque
-from urllib.parse import urldefrag, urljoin, urlparse
+from urllib.parse import parse_qs, unquote, urldefrag, urljoin, urlparse
 
 from bs4 import BeautifulSoup
 from markdownify import markdownify as to_markdown
 
 from .analyzer import analyze_crawl
+
+
+PROGRAM_HINTS = {
+    "digital": "Digital Europe",
+    "horizon": "Horizon Europe",
+    "erasmus": "Erasmus+",
+    "life": "LIFE",
+    "eic": "European Innovation Council",
+    "eurostars": "Eurostars",
+    "cef": "Connecting Europe Facility",
+    "eu4health": "EU4Health",
+    "creative": "Creative Europe",
+    "citizens": "Citizens, Equality, Rights and Values",
+}
 
 
 def _extract_links(html: str, base_url: str) -> list[str]:
@@ -44,6 +58,83 @@ def allowed_by_patterns(url: str, include: list[str], exclude: list[str]) -> boo
     if exclude and any(pattern in url for pattern in exclude):
         return False
     return True
+
+
+def titleize_token(token: str) -> str:
+    upper_tokens = {"ai", "eu", "ict", "sme", "eic", "erc", "ri", "msca", "edf", "cef", "5g", "6g", "iot"}
+    if token.lower() in upper_tokens:
+        return token.upper()
+    if token.isdigit():
+        return token
+    return token.capitalize()
+
+
+def humanize_slug(slug: str) -> str:
+    cleaned = unquote(slug).replace("_", "-").strip("-")
+    parts = [part for part in cleaned.split("-") if part and not part.isdigit()]
+    return " ".join(titleize_token(part) for part in parts[:16])
+
+
+def infer_program(url: str, slug: str) -> str | None:
+    haystack = f"{url} {slug}".lower()
+    for marker, name in PROGRAM_HINTS.items():
+        if marker in haystack:
+            return name
+    return None
+
+
+def extract_years(text: str) -> list[str]:
+    years: list[str] = []
+    for year in [part for part in text.replace("/", "-").split("-") if part.isdigit() and len(part) == 4]:
+        if year.startswith("20") and year not in years:
+            years.append(year)
+    return years[:4]
+
+
+def extract_record_from_url(url: str) -> dict | None:
+    parsed = urlparse(url)
+    path = parsed.path
+    if "/topic-details/" not in path and "/call/" not in path and "topic" not in path.lower():
+        return None
+    slug = path.rstrip("/").split("/")[-1]
+    if not slug:
+        return None
+    query = parse_qs(parsed.query)
+    title = humanize_slug(slug)
+    years = extract_years(slug)
+    program = infer_program(url, slug)
+    keywords = [part for part in unquote(slug).replace("_", "-").split("-") if len(part) > 2 and not part.isdigit()][:12]
+    return {
+        "id": slug,
+        "title": title,
+        "url": url,
+        "source": parsed.netloc,
+        "type": "topic" if "topic" in path.lower() else "page",
+        "program": program,
+        "years": years,
+        "keywords": keywords,
+        "programme_period": (query.get("programmePeriod") or [None])[0],
+        "framework_programme": (query.get("frameworkProgramme") or [None])[0],
+        "summary": f"{title} başlıklı potansiyel fon/ihale konusu. Detay ve uygunluk bilgileri kaynak URL üzerinden takip edilmeli.",
+        "action": "Detay sayfasını aç, başvuru koşulları ve son tarihleri kontrol et.",
+    }
+
+
+def build_records(pages: list[dict], discovered: list[str]) -> list[dict]:
+    records: list[dict] = []
+    seen_ids: set[str] = set()
+    urls: list[str] = []
+    for page in pages:
+        urls.append(str(page.get("url")))
+        urls.extend(page.get("links") or [])
+    urls.extend(discovered)
+    for url in urls:
+        record = extract_record_from_url(url)
+        if not record or record["id"] in seen_ids:
+            continue
+        seen_ids.add(record["id"])
+        records.append(record)
+    return records[:250]
 
 
 def _metadata(html: str) -> dict:
@@ -173,9 +264,10 @@ async def crawl_url(payload: dict) -> dict:
         except Exception as exc:
             errors.append({"url": current_url, "depth": depth, "error": str(exc)})
 
+    records = build_records(pages, discovered)
     ai = None
     if payload.get("ai_extract", True):
-        ai = await analyze_crawl(pages, root_url, payload.get("analysis_prompt"))
+        ai = await analyze_crawl(pages, root_url, payload.get("analysis_prompt"), records)
 
     return {
         "url": root_url,
@@ -183,6 +275,8 @@ async def crawl_url(payload: dict) -> dict:
         "limit": limit,
         "pages_scraped": len(pages),
         "links_discovered": len(discovered),
+        "record_count": len(records),
+        "records": records,
         "ai": ai,
         "pages": pages,
         "discovered": discovered[: max(limit * 3, 50)],
