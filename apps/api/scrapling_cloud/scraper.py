@@ -94,7 +94,8 @@ def extract_years(text: str) -> list[str]:
 def extract_record_from_url(url: str) -> dict | None:
     parsed = urlparse(url)
     path = parsed.path
-    if "/topic-details/" not in path and "/call/" not in path and "topic" not in path.lower():
+    record_paths = ("/topic-details/", "/call/", "/calls/", "/opportunity-details/")
+    if not any(marker in path for marker in record_paths):
         return None
     slug = path.rstrip("/").split("/")[-1]
     if not slug:

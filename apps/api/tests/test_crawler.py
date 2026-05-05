@@ -30,3 +30,9 @@ def test_extract_record_from_topic_url() -> None:
     assert record["title"] == "Digital AI Continuum"
     assert record["program"] == "Digital Europe"
     assert record["years"] == ["2025"]
+
+
+def test_topic_index_is_not_extracted_as_record() -> None:
+    record = scraper.extract_record_from_url("https://ec.europa.eu/info/funding-tenders/opportunities/data/topic-list.html")
+
+    assert record is None

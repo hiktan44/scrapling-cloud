@@ -83,9 +83,19 @@ def parse_json_response(content: str) -> dict:
     return json.loads(text)
 
 
+def clean_api_key(value: str | None) -> str | None:
+    if not value:
+        return None
+    cleaned = value.strip()
+    placeholders = {"your-api-key", "your-z.ai-api-key", "your-Z.AI-api-key", "<senin-z.ai-key>"}
+    if not cleaned or cleaned in placeholders or (cleaned.startswith("<") and cleaned.endswith(">")):
+        return None
+    return cleaned
+
+
 def z_ai_key() -> str | None:
     settings = get_settings()
-    return settings.z_ai_api_key or settings.zai_api_key
+    return clean_api_key(settings.z_ai_api_key) or clean_api_key(settings.zai_api_key)
 
 
 async def call_zai_chat(system: str, corpus: dict[str, Any]) -> dict:
