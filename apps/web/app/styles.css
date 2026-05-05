@@ -1603,6 +1603,19 @@ pre {
   color: var(--ink);
 }
 
+.promptInput {
+  min-height: 132px;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfdfc;
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.5;
+}
+
 .crawlButton {
   width: 100%;
   border: 0;
@@ -1675,6 +1688,26 @@ pre {
 .aiSummary small {
   color: var(--muted);
   overflow-wrap: anywhere;
+}
+
+.promptEcho {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(133, 92, 248, 0.22);
+  border-radius: 8px;
+  background: #f7f4ff;
+}
+
+.promptEcho strong {
+  color: var(--violet);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.promptEcho span {
+  color: #394a46;
+  line-height: 1.5;
 }
 
 .aiGrid {

@@ -39,6 +39,7 @@ type AiAnalysis = {
   enabled?: boolean;
   provider?: string;
   reason?: string;
+  prompt?: string | null;
   summary?: string;
   key_points?: string[];
   opportunities?: Array<string | Record<string, unknown>>;
@@ -75,6 +76,9 @@ export default function DataExplorerPage() {
   const [limit, setLimit] = useState(12);
   const [maxDepth, setMaxDepth] = useState(2);
   const [mode, setMode] = useState<Mode>("static");
+  const [analysisPrompt, setAnalysisPrompt] = useState(
+    "Bu sitedeki verileri kullanarak kullanıcının işine yarayacak anlamlı bir rapor çıkar. Önemli başlıkları, fırsat/ihale sinyallerini, kurumları, tarihleri ve yapılacak aksiyonları Türkçe listele."
+  );
   const [query, setQuery] = useState("");
   const [job, setJob] = useState<JobDetail | null>(null);
   const [error, setError] = useState("");
@@ -128,7 +132,7 @@ export default function DataExplorerPage() {
           max_depth: maxDepth,
           mode,
           ai_extract: true,
-          analysis_prompt: "Bu siteyi kullanıcı için anlamlı hale getir. Özet, önemli noktalar, fırsatlar, kurum/konu varlıkları ve sonraki aksiyonları Türkçe çıkar.",
+          analysis_prompt: analysisPrompt.trim() || null,
           formats: ["markdown", "links", "metadata", "text"]
         })
       });
@@ -221,6 +225,15 @@ export default function DataExplorerPage() {
               ))}
             </div>
           </div>
+          <label>
+            Analiz prompt'u
+            <textarea
+              className="promptInput"
+              value={analysisPrompt}
+              onChange={(event) => setAnalysisPrompt(event.target.value)}
+              placeholder="Örn: Bu sitedeki fon çağrılarını sektör, bütçe, son başvuru tarihi ve uygunluk kriterlerine göre çıkar."
+            />
+          </label>
           <button className="primary crawlButton" onClick={runCrawl} disabled={working}>
             {working ? <Loader2 className="spin" size={18} /> : <Play size={18} />}
             Derin crawl başlat
@@ -258,6 +271,12 @@ export default function DataExplorerPage() {
                 <strong>{ai.provider ?? "analysis"}</strong>
               </div>
               <p>{ai.summary}</p>
+              {ai.prompt && (
+                <div className="promptEcho">
+                  <strong>Kullanılan prompt</strong>
+                  <span>{ai.prompt}</span>
+                </div>
+              )}
               {ai.reason && <small>{ai.reason}</small>}
               <div className="aiGrid">
                 <AiList title="Önemli noktalar" items={ai.key_points} />

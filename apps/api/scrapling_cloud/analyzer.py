@@ -20,7 +20,7 @@ def compact_page(page: dict, max_chars: int = 3500) -> dict:
     }
 
 
-def fallback_analysis(pages: list[dict], reason: str) -> dict:
+def fallback_analysis(pages: list[dict], reason: str, instruction: str | None = None) -> dict:
     page_summaries = []
     for page in pages[:12]:
         text = str(page.get("markdown") or page.get("text") or "").replace("\n", " ").strip()
@@ -38,7 +38,11 @@ def fallback_analysis(pages: list[dict], reason: str) -> dict:
         "enabled": False,
         "provider": "fallback",
         "reason": reason,
-        "summary": "LLM anahtarı yapılandırılmadığı için otomatik yapısal özet üretildi. OpenAI anahtarı eklenince bu alan sayfa içeriklerini anlayıp daha anlamlı özet, fırsat ve aksiyonlar çıkarır.",
+        "prompt": instruction,
+        "summary": (
+            "LLM anahtarı yapılandırılmadığı için otomatik yapısal özet üretildi. "
+            "OpenAI anahtarı eklenince sonuç kullanıcının verdiği prompt isteğine göre üretilecek."
+        ),
         "key_points": titles[:6] or ["Sayfalar scrape edildi, fakat anlamlı başlık sayısı sınırlı."],
         "opportunities": [],
         "entities": [],
@@ -62,7 +66,7 @@ def extract_response_text(data: dict[str, Any]) -> str:
 async def analyze_crawl(pages: list[dict], root_url: str, instruction: str | None = None) -> dict:
     settings = get_settings()
     if not settings.openai_api_key:
-        return fallback_analysis(pages, "OPENAI_API_KEY is not configured")
+        return fallback_analysis(pages, "OPENAI_API_KEY is not configured", instruction)
 
     corpus = {
         "root_url": root_url,
@@ -97,9 +101,10 @@ async def analyze_crawl(pages: list[dict], root_url: str, instruction: str | Non
         parsed["enabled"] = True
         parsed["provider"] = "openai"
         parsed["model"] = settings.openai_model
+        parsed["prompt"] = instruction
         return parsed
     except Exception as exc:
-        fallback = fallback_analysis(pages, f"LLM analysis failed: {exc}")
+        fallback = fallback_analysis(pages, f"LLM analysis failed: {exc}", instruction)
         fallback["enabled"] = False
         fallback["provider"] = "fallback_after_error"
         return fallback
