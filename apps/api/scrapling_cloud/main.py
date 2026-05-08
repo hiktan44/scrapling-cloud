@@ -10,8 +10,11 @@ from .billing import estimate_credits
 from .config import get_settings
 from .db import create_all, get_db
 from .jobs import create_job
-from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, Organization, User
+from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, Organization, UsageEvent, User
 from .schemas import (
+    AdminApiKeyCreate,
+    AdminCreditUpdate,
+    AdminOrganizationResponse,
     ApiKeyCreate,
     ApiKeyResponse,
     AuthLogin,
@@ -28,8 +31,8 @@ from .schemas import (
     UsageSummary,
 )
 from .scraper import map_url, scrape_url
-from .security import Principal, create_api_key, hash_api_key, hash_password, require_api_key, verify_password
-from .seed import seed_demo
+from .security import Principal, create_api_key, hash_api_key, hash_password, require_admin, require_api_key, verify_password
+from .seed import seed_admin, seed_demo
 
 settings = get_settings()
 app = FastAPI(
@@ -55,6 +58,7 @@ def startup() -> None:
     db = SessionLocal()
     try:
         seed_demo(db)
+        seed_admin(db)
     finally:
         db.close()
 
@@ -70,7 +74,7 @@ def ready(db: Session = Depends(get_db)) -> dict:
     return {"ok": True}
 
 
-def auth_response(raw_key: str, organization: Organization) -> AuthResponse:
+def auth_response(raw_key: str, organization: Organization, is_admin: bool = False) -> AuthResponse:
     return AuthResponse(
         api_key=raw_key,
         organization_id=organization.id,
@@ -78,10 +82,16 @@ def auth_response(raw_key: str, organization: Organization) -> AuthResponse:
         plan=organization.plan,
         monthly_credits=organization.monthly_credits,
         concurrency_limit=organization.concurrency_limit,
+        is_admin=is_admin,
     )
 
 
-def create_dashboard_key(db: Session, organization: Organization, name: str = "Dashboard session") -> str:
+def create_dashboard_key(
+    db: Session,
+    organization: Organization,
+    name: str = "Dashboard session",
+    scopes: list[str] | None = None,
+) -> str:
     raw_key = create_api_key()
     db.add(
         ApiKey(
@@ -89,7 +99,7 @@ def create_dashboard_key(db: Session, organization: Organization, name: str = "D
             name=name,
             key_prefix=raw_key[:10],
             key_hash=hash_api_key(raw_key),
-            scopes=["scrape", "crawl", "map", "extract"],
+            scopes=scopes or ["scrape", "crawl", "map", "extract"],
         )
     )
     return raw_key
@@ -130,14 +140,17 @@ def login(payload: AuthLogin, db: Session = Depends(get_db)) -> AuthResponse:
     if organization is None:
         raise HTTPException(status_code=401, detail="Invalid organization")
 
-    raw_key = create_dashboard_key(db, organization)
+    scopes = ["scrape", "crawl", "map", "extract"]
+    if user.role == "admin":
+        scopes = ["admin", *scopes]
+    raw_key = create_dashboard_key(db, organization, scopes=scopes)
     db.commit()
-    return auth_response(raw_key, organization)
+    return auth_response(raw_key, organization, is_admin=user.role == "admin")
 
 
 @app.get("/v1/me", response_model=AuthResponse)
 def me(principal: Principal = Depends(require_api_key)) -> AuthResponse:
-    return auth_response(principal.api_key.key_prefix, principal.organization)
+    return auth_response(principal.api_key.key_prefix, principal.organization, is_admin="admin" in (principal.api_key.scopes or []))
 
 
 @app.post("/v1/scrape", response_model=JobResponse)
@@ -291,6 +304,98 @@ def usage(principal: Principal = Depends(require_api_key)) -> UsageSummary:
         used_credits=org.used_credits,
         remaining_credits=max(0, org.monthly_credits - org.used_credits),
         concurrency_limit=org.concurrency_limit,
+        is_admin="admin" in (principal.api_key.scopes or []),
+    )
+
+
+def admin_org_response(db: Session, org: Organization) -> AdminOrganizationResponse:
+    owner = db.scalar(select(User).where(User.organization_id == org.id).order_by(User.created_at))
+    return AdminOrganizationResponse(
+        id=org.id,
+        name=org.name,
+        plan=org.plan,
+        monthly_credits=org.monthly_credits,
+        used_credits=org.used_credits,
+        remaining_credits=max(0, org.monthly_credits - org.used_credits),
+        concurrency_limit=org.concurrency_limit,
+        owner_email=owner.email if owner else None,
+        created_at=org.created_at.isoformat(),
+    )
+
+
+@app.get("/v1/admin/organizations", response_model=list[AdminOrganizationResponse])
+def admin_organizations(
+    _admin: Principal = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> list[AdminOrganizationResponse]:
+    organizations = db.scalars(select(Organization).order_by(desc(Organization.created_at))).all()
+    return [admin_org_response(db, org) for org in organizations]
+
+
+@app.post("/v1/admin/organizations/{organization_id}/credits", response_model=AdminOrganizationResponse)
+def admin_update_credits(
+    organization_id: str,
+    payload: AdminCreditUpdate,
+    admin: Principal = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> AdminOrganizationResponse:
+    org = db.get(Organization, organization_id)
+    if org is None:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    if payload.operation == "add":
+        org.monthly_credits += payload.credits
+        db.add(UsageEvent(organization_id=org.id, job_id=None, credits=payload.credits, reason=f"admin_credit_add:{admin.organization.id}"))
+    elif payload.operation == "set_monthly":
+        org.monthly_credits = payload.credits
+        db.add(UsageEvent(organization_id=org.id, job_id=None, credits=payload.credits, reason=f"admin_credit_set:{admin.organization.id}"))
+    elif payload.operation == "reset_usage":
+        org.used_credits = 0
+        if payload.credits:
+            org.monthly_credits = payload.credits
+        db.add(UsageEvent(organization_id=org.id, job_id=None, credits=0, reason=f"admin_usage_reset:{admin.organization.id}"))
+
+    if payload.plan:
+        org.plan = payload.plan
+    if payload.concurrency_limit is not None:
+        org.concurrency_limit = payload.concurrency_limit
+
+    db.commit()
+    db.refresh(org)
+    return admin_org_response(db, org)
+
+
+@app.post("/v1/admin/organizations/{organization_id}/api-keys", response_model=ApiKeyResponse)
+def admin_create_api_key(
+    organization_id: str,
+    payload: AdminApiKeyCreate,
+    _admin: Principal = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> ApiKeyResponse:
+    org = db.get(Organization, organization_id)
+    if org is None:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    raw_key = create_api_key()
+    api_key = ApiKey(
+        organization_id=org.id,
+        name=payload.name,
+        key_prefix=raw_key[:10],
+        key_hash=hash_api_key(raw_key),
+        scopes=payload.scopes,
+    )
+    db.add(api_key)
+    db.commit()
+    db.refresh(api_key)
+    return ApiKeyResponse(
+        id=api_key.id,
+        name=api_key.name,
+        prefix=api_key.key_prefix,
+        scopes=api_key.scopes,
+        revoked=api_key.revoked,
+        last_used_at=None,
+        created_at=api_key.created_at.isoformat(),
+        key=raw_key,
     )
 
 

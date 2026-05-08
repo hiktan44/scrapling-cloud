@@ -1188,6 +1188,96 @@ pre {
   font-weight: 850;
 }
 
+.successNotice {
+  width: fit-content;
+  padding: 12px 14px;
+  border: 1px solid rgba(24, 160, 88, 0.28);
+  border-radius: 8px;
+  color: #126b42;
+  background: #effaf4;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.adminOrgGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.adminOrgGrid button {
+  display: grid;
+  gap: 8px;
+  min-height: 118px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfc;
+  text-align: left;
+}
+
+.adminOrgGrid button.selected {
+  border-color: rgba(15, 155, 142, 0.55);
+  background: #eaf8f6;
+  box-shadow: 0 0 0 3px rgba(15, 155, 142, 0.12);
+}
+
+.adminOrgGrid span,
+.adminOrgGrid small {
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.adminOrgGrid strong {
+  color: var(--ink);
+  font-size: 20px;
+}
+
+.adminControlGrid {
+  align-content: start;
+}
+
+.adminFormGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.adminFormGrid.single {
+  grid-template-columns: minmax(260px, 520px);
+}
+
+.adminFormGrid label {
+  display: grid;
+  gap: 8px;
+  color: #354541;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.adminFormGrid input {
+  height: 46px;
+  width: 100%;
+  min-width: 0;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+}
+
+.adminButtonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.adminButtonRow .primary,
+.adminButtonRow .secondary {
+  border: 0;
+}
+
 .spin {
   animation: spin 900ms linear infinite;
 }
@@ -2156,6 +2246,9 @@ pre {
   .dataResults .statusStrip,
   .aiGrid,
   .recordGrid,
+  .adminOrgGrid,
+  .adminFormGrid,
+  .adminFormGrid.single,
   .numberGrid,
   .formatGrid {
     grid-template-columns: 1fr;

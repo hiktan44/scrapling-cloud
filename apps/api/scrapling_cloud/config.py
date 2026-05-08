@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     proxy_provider_url: str | None = None
     proxy_provider_token: str | None = None
     demo_api_key: str = Field(default="sk_demo_local_development_key")
+    admin_email: str = "admin@scrapling.cloud"
+    admin_password: str = "admin12345"
+    admin_api_key: str = Field(default="sk_admin_local_development_key")
     allowed_origins: list[str] = ["http://localhost:3000"]
 
 

@@ -103,6 +103,7 @@ class AuthResponse(BaseModel):
     plan: str
     monthly_credits: int
     concurrency_limit: int
+    is_admin: bool = False
 
 
 class UsageSummary(BaseModel):
@@ -111,6 +112,7 @@ class UsageSummary(BaseModel):
     used_credits: int
     remaining_credits: int
     concurrency_limit: int
+    is_admin: bool = False
 
 
 class DomainProfileResponse(BaseModel):
@@ -121,3 +123,27 @@ class DomainProfileResponse(BaseModel):
     proxy_success_rate: int
     failure_reasons: list[str]
     recommendations: list[str]
+
+
+class AdminOrganizationResponse(BaseModel):
+    id: str
+    name: str
+    plan: str
+    monthly_credits: int
+    used_credits: int
+    remaining_credits: int
+    concurrency_limit: int
+    owner_email: str | None = None
+    created_at: str
+
+
+class AdminCreditUpdate(BaseModel):
+    operation: Literal["add", "set_monthly", "reset_usage"] = "add"
+    credits: int = Field(default=0, ge=0, le=100_000_000)
+    plan: str | None = Field(default=None, max_length=40)
+    concurrency_limit: int | None = Field(default=None, ge=1, le=1000)
+
+
+class AdminApiKeyCreate(BaseModel):
+    name: str = Field(default="Admin issued key", min_length=1, max_length=160)
+    scopes: list[str] = Field(default_factory=lambda: ["scrape", "crawl", "map", "extract"])

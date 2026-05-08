@@ -60,3 +60,9 @@ def require_api_key(
     api_key.last_used_at = datetime.utcnow()
     db.commit()
     return Principal(organization=organization, api_key=api_key)
+
+
+def require_admin(principal: Principal = Depends(require_api_key)) -> Principal:
+    if "admin" not in (principal.api_key.scopes or []):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin API key required")
+    return principal

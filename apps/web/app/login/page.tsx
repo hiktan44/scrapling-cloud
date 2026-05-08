@@ -38,6 +38,7 @@ export default function LoginPage() {
       }
       localStorage.setItem("scrapling_cloud_api_key", data.api_key);
       localStorage.setItem("scrapling_cloud_workspace", data.organization_name);
+      localStorage.setItem("scrapling_cloud_is_admin", data.is_admin ? "true" : "false");
       window.location.href = "/dashboard";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Beklenmeyen hata oluştu");

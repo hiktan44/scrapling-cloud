@@ -11,6 +11,7 @@ import {
   LogOut,
   Plus,
   RefreshCw,
+  ShieldCheck,
   Trash2
 } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +25,7 @@ type Usage = {
   used_credits: number;
   remaining_credits: number;
   concurrency_limit: number;
+  is_admin?: boolean;
 };
 
 type ApiKey = {
@@ -141,6 +143,7 @@ export default function DashboardPage() {
   function logout() {
     localStorage.removeItem("scrapling_cloud_api_key");
     localStorage.removeItem("scrapling_cloud_workspace");
+    localStorage.removeItem("scrapling_cloud_is_admin");
     window.location.href = "/login";
   }
 
@@ -154,6 +157,7 @@ export default function DashboardPage() {
         <nav>
           <a href="#overview"><Activity size={18} /> Genel bakış</a>
           <a href="#keys"><KeyRound size={18} /> API key</a>
+          {usage?.is_admin && <Link href="/admin"><ShieldCheck size={18} /> Admin</Link>}
           <Link href="/playground"><ArrowRight size={18} /> Playground</Link>
           <Link href="/data"><DatabaseZap size={18} /> Data Explorer</Link>
           <a href={`${apiUrl}/docs`} target="_blank"><BookOpenText size={18} /> Docs</a>
