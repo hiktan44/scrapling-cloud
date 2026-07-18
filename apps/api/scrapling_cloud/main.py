@@ -9,7 +9,7 @@ from . import __version__
 from .billing import estimate_credits
 from .config import get_settings
 from .db import create_all, get_db
-from .jobs import create_job
+from .jobs import create_job, requeue_stuck_jobs
 from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, Organization, UsageEvent, User
 from .schemas import (
     AdminApiKeyCreate,
@@ -143,6 +143,17 @@ def login(payload: AuthLogin, db: Session = Depends(get_db)) -> AuthResponse:
     scopes = ["scrape", "crawl", "map", "extract"]
     if user.role == "admin":
         scopes = ["admin", *scopes]
+    # Revoke previous dashboard session keys: every login mints a fresh key,
+    # and without cleanup the key list would grow unbounded (and stay valid).
+    stale_keys = db.scalars(
+        select(ApiKey).where(
+            ApiKey.organization_id == organization.id,
+            ApiKey.name == "Dashboard session",
+            ApiKey.revoked.is_(False),
+        )
+    ).all()
+    for stale in stale_keys:
+        stale.revoked = True
     raw_key = create_dashboard_key(db, organization, scopes=scopes)
     db.commit()
     return auth_response(raw_key, organization, is_admin=user.role == "admin")
@@ -397,6 +408,16 @@ def admin_create_api_key(
         created_at=api_key.created_at.isoformat(),
         key=raw_key,
     )
+
+
+@app.post("/v1/admin/requeue")
+def admin_requeue(
+    _admin: Principal = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Re-enqueue jobs stuck in 'queued' state (e.g. after a Redis outage)."""
+    requeued = requeue_stuck_jobs(db, older_than_seconds=0)
+    return {"requeued": requeued}
 
 
 @app.get("/v1/domain-profiles", response_model=list[DomainProfileResponse])
