@@ -83,11 +83,18 @@ export default function PlaygroundPage() {
 
   async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${apiUrl}${path}`, { ...init, headers: { ...headers, ...init?.headers } });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.detail ?? "API isteği başarısız oldu");
+    const text = await response.text();
+    let data: { detail?: unknown } & Record<string, unknown> = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = {};
     }
-    return data;
+    if (!response.ok) {
+      const detail = typeof data?.detail === "string" ? data.detail : null;
+      throw new Error(detail ?? `API isteği başarısız oldu (HTTP ${response.status}). Birkaç saniye sonra tekrar dene.`);
+    }
+    return data as T;
   }
 
   function toggleFormat(format: Format) {
@@ -158,13 +165,13 @@ export default function PlaygroundPage() {
   }
 
   async function pollJob(jobId: string) {
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 1600));
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       const detail = await apiFetch<JobResponse>(`/v1/jobs/${jobId}`);
       setJob(detail);
       setResultText(JSON.stringify(detail, null, 2));
       const status = String(detail.status);
-      const percent = Math.min(90, 40 + attempt * 6);
+      const percent = Math.min(90, 40 + attempt * 3);
       setProgress({
         visible: true,
         percent: status === "succeeded" || status === "failed" ? 100 : percent,
