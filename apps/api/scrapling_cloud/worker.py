@@ -1,14 +1,19 @@
 import asyncio
+import logging
+import threading
+import time
 from traceback import format_exc
 
 from rq import Worker
 
 from .db import SessionLocal
-from .jobs import mark_failed, mark_running, mark_succeeded, send_webhook
+from .jobs import mark_failed, mark_running, mark_succeeded, requeue_stuck_jobs, send_webhook
 from .learning import record_failure, record_success
-from .models import Job, JobKind
+from .models import Job, JobKind, JobStatus
 from .queue import get_queue, get_redis
 from .scraper import crawl_url, map_url, scrape_url
+
+logger = logging.getLogger(__name__)
 
 
 def classify_error(error: str) -> str:
@@ -29,6 +34,11 @@ async def _run(job_id: str) -> None:
     try:
         job = db.get(Job, job_id)
         if job is None:
+            return
+        if job.status != JobStatus.queued.value:
+            # Duplicate delivery (recovery sweep or a retried enqueue) -
+            # the job already ran or is running, so skip it idempotently.
+            logger.info("skipping job %s with status %s", job_id, job.status)
             return
         mark_running(db, job)
 
@@ -75,9 +85,36 @@ def run_job(job_id: str) -> None:
     asyncio.run(_run(job_id))
 
 
+def _requeue_sweep(stop: threading.Event, interval_seconds: int = 60) -> None:
+    """Periodically re-enqueue jobs that never reached the queue."""
+    while not stop.is_set():
+        try:
+            db = SessionLocal()
+            try:
+                requeue_stuck_jobs(db)
+            finally:
+                db.close()
+        except Exception:
+            logger.exception("requeue sweep failed")
+        stop.wait(interval_seconds)
+
+
 def main() -> None:
-    queue = get_queue()
-    Worker([queue], connection=get_redis()).work()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    stop = threading.Event()
+    threading.Thread(target=_requeue_sweep, args=(stop,), daemon=True).start()
+    while True:
+        try:
+            queue = get_queue()
+            Worker([queue], connection=get_redis()).work()
+        except KeyboardInterrupt:
+            stop.set()
+            raise
+        except Exception:
+            # A Redis restart or network drop must not kill the worker for
+            # good - log and re-enter the work loop.
+            logger.exception("worker loop interrupted; restarting in 5s")
+            time.sleep(5)
 
 
 if __name__ == "__main__":
