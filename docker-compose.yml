@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-scrapling_cloud}
       POSTGRES_USER: ${POSTGRES_USER:-scrapling}
@@ -15,7 +16,10 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    # noeviction: queued jobs must never be silently dropped under memory
+    # pressure. Keep maxmemory comfortably below the container limit.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "${REDIS_MAXMEMORY:-256mb}", "--maxmemory-policy", "noeviction"]
     volumes:
       - redis_data:/data
     healthcheck:
@@ -27,6 +31,7 @@ services:
   api:
     build:
       context: ./apps/api
+    restart: unless-stopped
     environment:
       APP_NAME: ${APP_NAME:-Scrapling Cloud}
       APP_URL: ${APP_URL:-http://localhost:3000}
@@ -35,6 +40,13 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       JWT_SECRET: ${JWT_SECRET:-change-me}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      SEED_DEMO: ${SEED_DEMO:-false}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      DEMO_API_KEY: ${DEMO_API_KEY:-sk_demo_local_development_key}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@scrapling.cloud}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -62,6 +74,7 @@ services:
   worker:
     build:
       context: ./apps/api
+    restart: unless-stopped
     command: ["python", "-m", "scrapling_cloud.worker"]
     environment:
       APP_NAME: ${APP_NAME:-Scrapling Cloud}
@@ -71,6 +84,13 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       JWT_SECRET: ${JWT_SECRET:-change-me}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-me}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      SEED_DEMO: ${SEED_DEMO:-false}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      DEMO_API_KEY: ${DEMO_API_KEY:-sk_demo_local_development_key}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@scrapling.cloud}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -83,12 +103,20 @@ services:
       PROXY_PROVIDER_URL: ${PROXY_PROVIDER_URL:-}
       PROXY_PROVIDER_TOKEN: ${PROXY_PROVIDER_TOKEN:-}
     depends_on:
+      redis:
+        condition: service_healthy
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f scrapling_cloud.worker || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   web:
     build:
       context: ./apps/web
+    restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     depends_on:
