@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 
 Format = Literal["markdown", "html", "text", "links", "metadata", "screenshot", "json"]
@@ -39,13 +39,22 @@ class MapRequest(BaseModel):
 
 
 class ExtractRequest(BaseModel):
+    """Firecrawl-style extraction: send a JSON schema and/or a natural-language prompt."""
+
     model_config = ConfigDict(populate_by_name=True)
 
     url: HttpUrl
-    extraction_schema: dict[str, Any] = Field(alias="schema")
+    extraction_schema: dict[str, Any] | None = Field(default=None, alias="schema")
+    prompt: str | None = Field(default=None, max_length=4000)
+    instructions: str | None = Field(default=None, max_length=4000)
     mode: Mode = "auto"
-    instructions: str | None = None
     webhook_url: HttpUrl | None = None
+
+    @model_validator(mode="after")
+    def require_schema_or_prompt(self) -> "ExtractRequest":
+        if not self.extraction_schema and not (self.prompt or self.instructions):
+            raise ValueError("Provide at least one of 'schema' or 'prompt'.")
+        return self
 
 
 class BatchRequest(BaseModel):
