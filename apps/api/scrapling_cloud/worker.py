@@ -6,6 +6,7 @@ from traceback import format_exc
 
 from rq import Worker
 
+from .analyzer import extract_with_prompt
 from .db import SessionLocal
 from .jobs import mark_failed, mark_running, mark_succeeded, requeue_stuck_jobs, send_webhook
 from .learning import record_failure, record_success
@@ -46,8 +47,11 @@ async def _run(job_id: str) -> None:
             result = await scrape_url(job.request)
         elif job.kind == JobKind.extract.value:
             payload = dict(job.request)
-            payload["formats"] = ["json", "metadata"]
+            payload["formats"] = ["json", "metadata", "markdown"]
             result = await scrape_url(payload)
+            prompt = payload.get("prompt") or payload.get("instructions")
+            if prompt and not payload.get("schema"):
+                result["extraction"] = await extract_with_prompt(result, prompt)
         elif job.kind == JobKind.map.value:
             result = await map_url(job.request)
         elif job.kind == JobKind.crawl.value:
