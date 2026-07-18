@@ -23,7 +23,7 @@ import {
   Webhook,
   Zap
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Locale = "en" | "tr";
 
@@ -237,6 +237,22 @@ export default function Home() {
   const [locale, setLocale] = useState<Locale>("tr");
   const t = copy[locale];
   const publicApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  const [successRate, setSuccessRate] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${publicApiUrl}/v1/public/stats`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!cancelled && data && typeof data.success_rate === "number") {
+          setSuccessRate(data.success_rate);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [publicApiUrl]);
 
   return (
     <main>
@@ -284,8 +300,8 @@ ${t.codeStatus}
           </div>
           <div className="chartCard floating">
             <div>
-              <span>{locale === "tr" ? "Başarı oranı" : "Success rate"}</span>
-              <strong>97.4%</strong>
+              <span>{locale === "tr" ? "Başarı oranı (canlı)" : "Success rate (live)"}</span>
+              <strong>{successRate !== null ? `${successRate}%` : "—"}</strong>
             </div>
             <MiniChart />
           </div>
@@ -369,7 +385,7 @@ ${t.codeStatus}
             <span>Python</span>
           </div>
           <pre>{`curl -X POST ${publicApiUrl}/v1/scrape \\
-  -H "Authorization: Bearer sk_demo_local_development_key" \\
+  -H "Authorization: Bearer sk_..." \\
   -H "Content-Type: application/json" \\
   -d '{"url":"https://example.com","formats":["markdown","links"]}'`}</pre>
         </div>
