@@ -189,3 +189,40 @@ async def analyze_crawl(pages: list[dict], root_url: str, instruction: str | Non
         fallback["enabled"] = False
         fallback["provider"] = "fallback_after_error"
         return fallback
+
+
+async def extract_with_prompt(scrape_result: dict, prompt: str) -> dict:
+    """Firecrawl-style prompt extraction: pull structured data out of a
+    scraped page using the configured LLM, guided by a natural-language
+    prompt. Falls back to the schema-free JSON when no LLM key is set."""
+    settings = get_settings()
+    provider = settings.llm_provider.lower()
+    basic = scrape_result.get("json") or {}
+
+    if provider == "zai" and not z_ai_key():
+        return {"enabled": False, "provider": "fallback", "reason": "Z_AI_API_KEY is not configured", "data": basic, "prompt": prompt}
+    if provider == "openai" and not settings.openai_api_key:
+        return {"enabled": False, "provider": "fallback", "reason": "OPENAI_API_KEY is not configured", "data": basic, "prompt": prompt}
+
+    corpus = {
+        "url": scrape_result.get("url"),
+        "metadata": scrape_result.get("metadata"),
+        "content": str(scrape_result.get("markdown") or scrape_result.get("text") or "")[:12000],
+        "instruction": prompt,
+    }
+    system = (
+        "Sen bir veri çıkarma asistanısın. Verilen sayfa içeriğinden kullanıcının prompt'una uyan yapılandırılmış "
+        "bilgiyi çıkar. Sadece geçerli JSON döndür: tek bir 'data' objesi içinde istenen alanlar olsun. "
+        "Bulunamayan alanlar için null kullan, uydurma değer üretme."
+    )
+    try:
+        if provider == "zai":
+            parsed = await call_zai_chat(system, corpus)
+        elif provider == "openai":
+            parsed = await call_openai_responses(system, corpus)
+        else:
+            return {"enabled": False, "provider": "fallback", "reason": f"Unsupported LLM_PROVIDER: {settings.llm_provider}", "data": basic, "prompt": prompt}
+        parsed["prompt"] = prompt
+        return parsed
+    except Exception as exc:
+        return {"enabled": False, "provider": "fallback_after_error", "reason": f"LLM extraction failed: {exc}", "data": basic, "prompt": prompt}
