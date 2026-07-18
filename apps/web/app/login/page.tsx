@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, KeyRound, Loader2, LockKeyhole, Mail } from "lucide-react";
+import { ArrowRight, KeyRound, Loader2, LockKeyhole, Mail } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
@@ -10,8 +10,8 @@ type Mode = "login" | "signup";
 
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("login");
-  const [email, setEmail] = useState("demo@scrapling.cloud");
-  const [password, setPassword] = useState("demo12345");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [organizationName, setOrganizationName] = useState("My Workspace");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -102,16 +102,11 @@ export default function LoginPage() {
             <ArrowRight size={18} />
           </button>
         </form>
-        <div className="demoBox">
-          <strong>Demo giriş</strong>
-          <span><Check size={16} /> demo@scrapling.cloud</span>
-          <span><Check size={16} /> demo12345</span>
-        </div>
       </section>
       <aside className="authAside">
         <div className="authMetric">
-          <span>Kalan kredi</span>
-          <strong>50,000</strong>
+          <span>Ücretsiz başlangıç kredisi</span>
+          <strong>10,000</strong>
         </div>
         <div className="authMetric">
           <span>Endpoint</span>
