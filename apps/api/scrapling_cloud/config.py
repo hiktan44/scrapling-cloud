@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import AnyHttpUrl, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,11 +25,21 @@ class Settings(BaseSettings):
     zai_model: str = "glm-5.1"
     proxy_provider_url: str | None = None
     proxy_provider_token: str | None = None
+    # Secure-by-default: behave like production unless ENVIRONMENT says
+    # otherwise. Development conveniences (seeded demo account, default
+    # admin credentials) stay off until explicitly enabled.
+    environment: str = "production"
+    seed_demo: bool = False
+    demo_password: str = "demo12345"
     demo_api_key: str = Field(default="sk_demo_local_development_key")
     admin_email: str = "admin@scrapling.cloud"
-    admin_password: str = "admin12345"
-    admin_api_key: str = Field(default="sk_admin_local_development_key")
+    admin_password: str = ""
+    admin_api_key: str = ""
     allowed_origins: list[str] = ["http://localhost:3000"]
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() == "production"
 
 
 @lru_cache
