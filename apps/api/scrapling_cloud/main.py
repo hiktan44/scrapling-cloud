@@ -1,7 +1,11 @@
+import json
+from datetime import datetime, timedelta
+
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from sqlalchemy import desc, select
+from redis.exceptions import RedisError
+from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -10,7 +14,9 @@ from .billing import estimate_credits
 from .config import get_settings
 from .db import create_all, get_db
 from .jobs import create_job, requeue_stuck_jobs
-from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, Organization, UsageEvent, User
+from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, JobStatus, Organization, UsageEvent, User
+from .queue import get_redis
+from .ratelimit import client_ip, rate_limit
 from .schemas import (
     AdminApiKeyCreate,
     AdminCreditUpdate,
@@ -74,6 +80,39 @@ def ready(db: Session = Depends(get_db)) -> dict:
     return {"ok": True}
 
 
+@app.get("/v1/public/stats")
+def public_stats(db: Session = Depends(get_db)) -> dict:
+    """Live platform metrics for the landing page (no auth, cached 60s)."""
+    cache_key = "public:stats"
+    try:
+        cached = get_redis().get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except RedisError:
+        pass
+
+    since = datetime.utcnow() - timedelta(days=7)
+    succeeded = db.scalar(
+        select(func.count(Job.id)).where(Job.status == JobStatus.succeeded.value, Job.created_at >= since)
+    ) or 0
+    failed = db.scalar(
+        select(func.count(Job.id)).where(Job.status == JobStatus.failed.value, Job.created_at >= since)
+    ) or 0
+    finished = succeeded + failed
+    payload = {
+        "success_rate": round(succeeded / finished * 100, 1) if finished else None,
+        "succeeded": succeeded,
+        "failed": failed,
+        "jobs_total": finished,
+        "window_days": 7,
+    }
+    try:
+        get_redis().setex(cache_key, 60, json.dumps(payload))
+    except RedisError:
+        pass
+    return payload
+
+
 def auth_response(raw_key: str, organization: Organization, is_admin: bool = False) -> AuthResponse:
     return AuthResponse(
         api_key=raw_key,
@@ -110,7 +149,8 @@ def job_response(job: Job) -> JobResponse:
 
 
 @app.post("/v1/auth/signup", response_model=AuthResponse)
-def signup(payload: AuthSignup, db: Session = Depends(get_db)) -> AuthResponse:
+def signup(payload: AuthSignup, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+    rate_limit(f"signup:{client_ip(request)}", limit=5, window_seconds=60)
     email = payload.email.strip().lower()
     if db.scalar(select(User).where(User.email == email)) is not None:
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -130,7 +170,8 @@ def signup(payload: AuthSignup, db: Session = Depends(get_db)) -> AuthResponse:
 
 
 @app.post("/v1/auth/login", response_model=AuthResponse)
-def login(payload: AuthLogin, db: Session = Depends(get_db)) -> AuthResponse:
+def login(payload: AuthLogin, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+    rate_limit(f"login:{client_ip(request)}", limit=10, window_seconds=60)
     email = payload.email.strip().lower()
     user = db.scalar(select(User).where(User.email == email))
     if user is None or not verify_password(payload.password, user.password_hash):
@@ -211,7 +252,8 @@ def batch(payload: BatchRequest, principal: Principal = Depends(require_api_key)
 
 
 @app.post("/v1/playground/scrape")
-async def playground_scrape(payload: ScrapeRequest) -> dict:
+async def playground_scrape(payload: ScrapeRequest, request: Request) -> dict:
+    rate_limit(f"playground:{client_ip(request)}", limit=30, window_seconds=60)
     return await scrape_url(payload.model_dump(mode="json", by_alias=True))
 
 
