@@ -9,10 +9,15 @@ logger = logging.getLogger(__name__)
 
 
 def client_ip(request: Request) -> str:
-    """Best-effort client IP behind a reverse proxy (Traefik/Coolify)."""
+    """Best-effort client IP behind a reverse proxy (Traefik/Coolify).
+
+    Trusts the right-most X-Forwarded-For entry - the one appended by the
+    trusted edge proxy - so clients cannot spoof their rate-limit bucket by
+    sending their own X-Forwarded-For header.
+    """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return forwarded.split(",")[-1].strip()
     return request.client.host if request.client else "unknown"
 
 
