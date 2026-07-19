@@ -14,6 +14,21 @@ MAX_ROWS = 50000
 
 URL_RE = re.compile(r"https?://[^\s,\"'<>\)\]]+", re.IGNORECASE)
 
+# Google Maps bağlantıları hiçbir zaman firma sitesi değildir
+MAPS_RE = re.compile(r"^https?://(www\.)?google\.[a-z.]+/maps", re.IGNORECASE)
+
+# Bu başlıkları taşıyan sütunlar site listesi sayılır. Böyle bir sütun varsa
+# yalnızca ondan URL alınır (Google Maps / sosyal medya sütunları atlanır).
+WEBSITE_HEADERS = {
+    "website", "web site", "web", "site", "url", "domain",
+    "web sitesi", "websitesi", "web adresi", "site adresi", "internet sitesi",
+}
+
+
+def _is_website_header(value: str) -> bool:
+    v = (value or "").strip().lower().replace("i̇", "i")
+    return v in WEBSITE_HEADERS or v.startswith(("website", "web site", "web sitesi", "websitesi"))
+
 SOCIAL_DOMAINS: list[tuple[str, tuple[str, ...]]] = [
     ("instagram", ("instagram.com",)),
     ("facebook", ("facebook.com", "fb.com", "fb.me")),
@@ -56,6 +71,8 @@ def _add_url(found: list[str], seen: set[str], raw: str) -> None:
     u = _normalize_url(raw)
     if not u:
         return
+    if MAPS_RE.match(u):
+        return
     host = re.sub(r"^https?://(www\.)?", "", u.lower()).split("/")[0]
     if not host or "." not in host:
         return
@@ -67,10 +84,16 @@ def _add_url(found: list[str], seen: set[str], raw: str) -> None:
 
 
 def parse_urls(filename: str, content: bytes) -> list[str]:
-    """Yüklenen dosyadan benzersiz URL listesi çıkar (xlsx, csv veya txt)."""
+    """Yüklenen dosyadan benzersiz URL listesi çıkar (xlsx, csv veya txt).
+
+    Dosyada "Website" benzeri bir başlık sütunu varsa yalnızca o sütun(lar)
+    kullanılır (firma rehberi modu); yoksa tüm hücreler/satırlar taranır.
+    """
     name = (filename or "").lower()
-    found: list[str] = []
-    seen: set[str] = set()
+    column_urls: list[str] = []   # website sütunundan gelenler (öncelikli)
+    column_seen: set[str] = set()
+    loose_urls: list[str] = []    # serbest taramadan gelenler (yedek)
+    loose_seen: set[str] = set()
 
     if name.endswith(".xlsx") or name.endswith(".xlsm"):
         try:
@@ -83,21 +106,25 @@ def parse_urls(filename: str, content: bytes) -> list[str]:
             raise ValueError("Excel dosyası okunamadı (bozuk veya şifreli olabilir)") from exc
         try:
             for sheet in wb.worksheets:
+                web_cols: list[int] = []
                 for r_idx, row in enumerate(sheet.iter_rows(values_only=True)):
-                    if r_idx >= MAX_ROWS or len(found) >= MAX_URLS:
+                    if r_idx >= MAX_ROWS or len(column_urls) >= MAX_URLS:
                         break
-                    for cell in row:
-                        if cell is None:
-                            continue
-                        text = str(cell)
-                        matches = URL_RE.findall(text)
-                        if matches:
-                            for m in matches:
-                                _add_url(found, seen, m)
-                        else:
-                            _add_url(found, seen, text)
-                        if len(found) >= MAX_URLS:
-                            break
+                    if r_idx <= 4 and not web_cols:
+                        web_cols = [i for i, cell in enumerate(row) if cell is not None and _is_website_header(str(cell))]
+                    if web_cols:
+                        for i in web_cols:
+                            if i < len(row) and row[i] is not None:
+                                text = str(row[i])
+                                for m in URL_RE.findall(text) or [text]:
+                                    _add_url(column_urls, column_seen, m)
+                    else:
+                        for cell in row:
+                            if cell is None:
+                                continue
+                            text = str(cell)
+                            for m in URL_RE.findall(text) or [text]:
+                                _add_url(loose_urls, loose_seen, m)
         finally:
             wb.close()
     else:
@@ -108,22 +135,31 @@ def parse_urls(filename: str, content: bytes) -> list[str]:
         if name.endswith(".csv"):
             try:
                 rows = csv.reader(io.StringIO(text))
+                web_cols: list[int] = []
                 for r_idx, row in enumerate(rows):
-                    if r_idx >= MAX_ROWS or len(found) >= MAX_URLS:
+                    if r_idx >= MAX_ROWS or len(column_urls) >= MAX_URLS:
                         break
-                    for cell in row:
-                        _add_url(found, seen, cell)
+                    if r_idx <= 4 and not web_cols:
+                        web_cols = [i for i, cell in enumerate(row) if _is_website_header(cell)]
+                    if web_cols:
+                        for i in web_cols:
+                            if i < len(row):
+                                _add_url(column_urls, column_seen, row[i])
+                    else:
+                        for cell in row:
+                            _add_url(loose_urls, loose_seen, cell)
             except csv.Error:
                 for line in text.splitlines():
-                    _add_url(found, seen, line)
+                    _add_url(loose_urls, loose_seen, line)
         else:
             for line in text.splitlines()[:MAX_ROWS]:
                 for m in URL_RE.findall(line) or [line]:
-                    _add_url(found, seen, m)
-                if len(found) >= MAX_URLS:
+                    _add_url(loose_urls, loose_seen, m)
+                if len(loose_urls) >= MAX_URLS:
                     break
 
-    return found[:MAX_URLS]
+    result = column_urls if column_urls else loose_urls
+    return result[:MAX_URLS]
 
 
 def _clean_social_url(href: str) -> str | None:
@@ -182,6 +218,21 @@ def extract_socials(links: list | None, markdown: str | None = None, site_host: 
     for key, url in roots.items():
         found.setdefault(key, url)
     return found
+
+
+def social_for_url(url: str) -> dict[str, str]:
+    """URL'nin kendisi bir sosyal medya profiliyse platform eşleşmesini döndür."""
+    host = re.sub(r"^https?://(www\.)?", "", (url or "").lower()).split("/")[0]
+    out: dict[str, str] = {}
+    for key, domains in SOCIAL_DOMAINS:
+        if any(
+            host.startswith(d) if d.endswith(".") else (host == d or host.endswith("." + d))
+            for d in domains
+        ):
+            cleaned = _clean_social_url(url)
+            if cleaned:
+                out[key] = cleaned
+    return out
 
 
 async def analyze_company(scrape_result: dict) -> str:

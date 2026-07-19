@@ -9,7 +9,7 @@ from rq import Worker
 
 from .analyzer import extract_with_prompt
 from .db import SessionLocal
-from .intel import analyze_company, extract_socials
+from .intel import analyze_company, extract_socials, social_for_url
 from .jobs import mark_failed, mark_running, mark_succeeded, requeue_stuck_jobs, send_webhook
 from .learning import record_failure, record_success
 from .models import Job, JobEvent, JobKind, JobStatus
@@ -76,6 +76,16 @@ async def _run(job_id: str) -> None:
                 nonlocal completed
                 item = {"url": target_url, "status": "ok", "socials": {}, "analysis": "", "error": None}
                 site_host = re.sub(r"^https?://(www\.)?", "", target_url.lower()).split("/")[0]
+                preset = social_for_url(target_url)
+                if preset:
+                    # Site yerine sosyal medya profili listelenmiş; taramaya gerek yok
+                    item["socials"] = preset
+                    item["analysis"] = "Firma, web sitesi yerine bu sosyal medya hesabını listelemiş."
+                    items[index] = item
+                    completed += 1
+                    db.add(JobEvent(job_id=job.id, message=f"İşlendi {completed}/{len(urls)}: {target_url}", data={"status": item["status"]}))
+                    db.commit()
+                    return
                 try:
                     async with semaphore:
                         scraped = await scrape_url(
