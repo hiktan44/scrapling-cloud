@@ -163,7 +163,10 @@ def extract_socials(links: list | None, markdown: str | None = None, site_host: 
         for key, domains in SOCIAL_DOMAINS:
             if key in found:
                 continue
-            if any(d in low for d in domains):
+            if any(
+                host.startswith(d) if d.endswith(".") else (host == d or host.endswith("." + d))
+                for d in domains
+            ):
                 cleaned = _clean_social_url(href)
                 if not cleaned:
                     break
