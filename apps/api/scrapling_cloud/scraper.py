@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections import deque
 from urllib.parse import parse_qs, unquote, urldefrag, urljoin, urlparse
 
@@ -146,14 +147,25 @@ def _metadata(html: str) -> dict:
     return {"title": title, "description": description}
 
 
+FETCH_STATIC_TIMEOUT = 45
+FETCH_DYNAMIC_TIMEOUT = 90
+
+
 async def fetch_html(url: str, mode: str = "static", wait_for: str | None = None) -> str:
     if mode in {"dynamic", "stealth"}:
         try:
             from scrapling.fetchers import StealthyFetcher, DynamicFetcher
 
             fetcher = StealthyFetcher if mode == "stealth" else DynamicFetcher
-            page = fetcher.fetch(url, wait_selector=wait_for) if wait_for else fetcher.fetch(url)
-            return str(page.html)
+
+            def _render() -> str:
+                page = fetcher.fetch(url, wait_selector=wait_for) if wait_for else fetcher.fetch(url)
+                return str(page.html)
+
+            # Scrapling fetchers are synchronous and have no reliable socket
+            # timeout; run them in a thread and bound the wait so a drip-feeding
+            # or fingerprint-stalling site cannot hang the worker forever.
+            return await asyncio.wait_for(asyncio.to_thread(_render), timeout=FETCH_DYNAMIC_TIMEOUT)
         except Exception:
             # Fall through to static fetching so the API remains useful without
             # browser dependencies during local smoke tests.
@@ -162,7 +174,7 @@ async def fetch_html(url: str, mode: str = "static", wait_for: str | None = None
     try:
         from scrapling.fetchers import Fetcher
 
-        page = Fetcher.fetch(url)
+        page = await asyncio.wait_for(asyncio.to_thread(Fetcher.fetch, url), timeout=FETCH_STATIC_TIMEOUT)
         return str(page.html)
     except Exception:
         import httpx

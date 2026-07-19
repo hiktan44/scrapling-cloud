@@ -66,25 +66,35 @@ async def _run(job_id: str) -> None:
             }
         elif job.kind == JobKind.intel.value:
             urls = [str(target) for target in (job.request.get("urls") or [])]
-            items: list[dict] = []
-            for index, target_url in enumerate(urls, start=1):
+            items: list[dict | None] = [None] * len(urls)
+            semaphore = asyncio.Semaphore(4)
+            completed = 0
+            mode = job.request.get("mode", "static")
+
+            async def process_url(index: int, target_url: str) -> None:
+                nonlocal completed
                 item = {"url": target_url, "status": "ok", "socials": {}, "analysis": "", "error": None}
                 try:
-                    scraped = await scrape_url(
-                        {"url": target_url, "formats": ["markdown", "links", "metadata"], "mode": job.request.get("mode", "static")}
-                    )
-                    item["socials"] = extract_socials(scraped.get("links") or [], scraped.get("markdown"))
-                    item["analysis"] = await analyze_company(scraped)
+                    async with semaphore:
+                        scraped = await scrape_url(
+                            {"url": target_url, "formats": ["markdown", "links", "metadata"], "mode": mode}
+                        )
+                        item["socials"] = extract_socials(scraped.get("links") or [], scraped.get("markdown"))
+                        item["analysis"] = await analyze_company(scraped)
                 except Exception as exc:
                     item["status"] = "error"
                     item["error"] = str(exc)[:300]
-                items.append(item)
-                db.add(JobEvent(job_id=job.id, message=f"İşlendi {index}/{len(urls)}: {target_url}", data={"status": item["status"]}))
+                items[index] = item
+                completed += 1
+                db.add(JobEvent(job_id=job.id, message=f"İşlendi {completed}/{len(urls)}: {target_url}", data={"status": item["status"]}))
                 db.commit()
+
+            await asyncio.gather(*(process_url(index, target_url) for index, target_url in enumerate(urls)))
+            finished = [entry for entry in items if entry is not None]
             result = {
-                "items": items,
+                "items": finished,
                 "total": len(urls),
-                "succeeded": sum(1 for entry in items if entry["status"] == "ok"),
+                "succeeded": sum(1 for entry in finished if entry["status"] == "ok"),
             }
         else:
             raise ValueError(f"Unsupported job kind: {job.kind}")
