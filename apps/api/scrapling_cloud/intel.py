@@ -67,6 +67,14 @@ def _normalize_url(value: str) -> str | None:
     return u.rstrip("/.,;")
 
 
+# Bu hostlarda path firmayı belirtir (instagram.com/a ile instagram.com/b farklı firmalar)
+PATH_SENSITIVE_HOSTS = {
+    "instagram.com", "facebook.com", "twitter.com", "x.com", "linkedin.com",
+    "youtube.com", "youtu.be", "tiktok.com", "wa.me", "t.me", "telegram.me",
+    "github.com", "linktr.ee", "threads.net",
+}
+
+
 def _add_url(found: list[str], seen: set[str], raw: str) -> None:
     u = _normalize_url(raw)
     if not u:
@@ -76,7 +84,11 @@ def _add_url(found: list[str], seen: set[str], raw: str) -> None:
     host = re.sub(r"^https?://(www\.)?", "", u.lower()).split("/")[0]
     if not host or "." not in host:
         return
-    key = host  # aynı domaini bir kez işle
+    if host in PATH_SENSITIVE_HOSTS or any(host.endswith("." + h) for h in PATH_SENSITIVE_HOSTS):
+        seg = re.sub(r"^https?://[^/]+", "", u.lower()).strip("/").split("/")[0]
+        key = f"{host}/{seg}" if seg else host
+    else:
+        key = host  # aynı domaini bir kez işle
     if key in seen:
         return
     seen.add(key)
