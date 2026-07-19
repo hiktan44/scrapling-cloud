@@ -8,6 +8,7 @@ import {
   Code2,
   Copy,
   DatabaseZap,
+  FileUp,
   Gauge,
   Globe2,
   Home,
@@ -210,6 +211,7 @@ export default function PlaygroundPage() {
         </Link>
         <nav>
           <Link href="/dashboard"><Home size={18} /> Dashboard</Link>
+          <Link href="/batch"><FileUp size={18} /> Toplu Analiz</Link>
           <Link href="/data"><DatabaseZap size={18} /> Data Explorer</Link>
           <a href={`${apiUrl}/docs`} target="_blank"><BookOpenText size={18} /> API Docs</a>
         </nav>

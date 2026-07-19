@@ -5,6 +5,7 @@ import {
   BookOpenText,
   DatabaseZap,
   FileText,
+  FileUp,
   Gauge,
   Globe2,
   Home,
@@ -191,6 +192,7 @@ export default function DataExplorerPage() {
         <nav>
           <Link href="/dashboard"><Home size={18} /> Dashboard</Link>
           <Link href="/playground"><Sparkles size={18} /> Playground</Link>
+          <Link href="/batch"><FileUp size={18} /> Toplu Analiz</Link>
           <a href={`${apiUrl}/docs`} target="_blank"><BookOpenText size={18} /> API Docs</a>
         </nav>
       </header>

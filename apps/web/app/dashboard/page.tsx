@@ -12,7 +12,8 @@ import {
   Plus,
   RefreshCw,
   ShieldCheck,
-  Trash2
+  Trash2,
+  Upload
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -159,6 +160,7 @@ export default function DashboardPage() {
           <a href="#keys"><KeyRound size={18} /> API key</a>
           {usage?.is_admin && <Link href="/admin"><ShieldCheck size={18} /> Admin</Link>}
           <Link href="/playground"><ArrowRight size={18} /> Playground</Link>
+          <Link href="/batch"><Upload size={18} /> Toplu Analiz</Link>
           <Link href="/data"><DatabaseZap size={18} /> Data Explorer</Link>
           <a href={`${apiUrl}/docs`} target="_blank"><BookOpenText size={18} /> Docs</a>
         </nav>
@@ -236,6 +238,18 @@ export default function DashboardPage() {
           </div>
           <Link className="primary" href="/playground">
             Playground’u aç
+            <ArrowRight size={18} />
+          </Link>
+        </section>
+
+        <section className="dashboardPanel playgroundLaunch">
+          <div>
+            <span>Toplu analiz</span>
+            <h2>Excel yükle, sosyal medya ve firma analizi al</h2>
+            <p>Site listeni .xlsx, .csv veya .txt olarak yükle; her site için sosyal medya hesapları ve kısa firma analizi içeren Excel raporu indir.</p>
+          </div>
+          <Link className="primary" href="/batch">
+            Toplu Analizi aç
             <ArrowRight size={18} />
           </Link>
         </section>
