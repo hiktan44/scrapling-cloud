@@ -26,6 +26,7 @@ class JobKind(str, Enum):
     map = "map"
     extract = "extract"
     batch = "batch"
+    intel = "intel"
 
 
 class Organization(Base):

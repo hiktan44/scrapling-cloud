@@ -32,7 +32,7 @@ def get_redis() -> Redis:
 
 
 def get_queue() -> Queue:
-    return Queue("scrapling-cloud", connection=get_redis(), default_timeout=600)
+    return Queue("scrapling-cloud", connection=get_redis(), default_timeout=900)
 
 
 def enqueue_job(func: str, *args, attempts: int = 4, base_delay: float = 0.4):

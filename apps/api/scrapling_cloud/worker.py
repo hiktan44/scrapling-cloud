@@ -8,9 +8,10 @@ from rq import Worker
 
 from .analyzer import extract_with_prompt
 from .db import SessionLocal
+from .intel import analyze_company, extract_socials
 from .jobs import mark_failed, mark_running, mark_succeeded, requeue_stuck_jobs, send_webhook
 from .learning import record_failure, record_success
-from .models import Job, JobKind, JobStatus
+from .models import Job, JobEvent, JobKind, JobStatus
 from .queue import get_queue, get_redis
 from .scraper import crawl_url, map_url, scrape_url
 
@@ -62,6 +63,28 @@ async def _run(job_id: str) -> None:
                     await scrape_url({"url": str(url), "formats": job.request.get("formats", ["markdown"]), "mode": job.request.get("mode", "static")})
                     for url in job.request.get("urls", [])
                 ]
+            }
+        elif job.kind == JobKind.intel.value:
+            urls = [str(target) for target in (job.request.get("urls") or [])]
+            items: list[dict] = []
+            for index, target_url in enumerate(urls, start=1):
+                item = {"url": target_url, "status": "ok", "socials": {}, "analysis": "", "error": None}
+                try:
+                    scraped = await scrape_url(
+                        {"url": target_url, "formats": ["markdown", "links", "metadata"], "mode": job.request.get("mode", "static")}
+                    )
+                    item["socials"] = extract_socials(scraped.get("links") or [], scraped.get("markdown"))
+                    item["analysis"] = await analyze_company(scraped)
+                except Exception as exc:
+                    item["status"] = "error"
+                    item["error"] = str(exc)[:300]
+                items.append(item)
+                db.add(JobEvent(job_id=job.id, message=f"İşlendi {index}/{len(urls)}: {target_url}", data={"status": item["status"]}))
+                db.commit()
+            result = {
+                "items": items,
+                "total": len(urls),
+                "succeeded": sum(1 for entry in items if entry["status"] == "ok"),
             }
         else:
             raise ValueError(f"Unsupported job kind: {job.kind}")

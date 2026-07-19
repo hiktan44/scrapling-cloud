@@ -19,3 +19,5 @@ IPython>=8.37
 httpx
 pytest==8.2.2
 pytest-asyncio==0.23.7
+python-multipart
+openpyxl

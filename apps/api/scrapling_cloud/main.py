@@ -1,9 +1,9 @@
 import json
 from datetime import datetime, timedelta
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from redis.exceptions import RedisError
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
@@ -13,6 +13,7 @@ from . import __version__
 from .billing import estimate_credits
 from .config import get_settings
 from .db import create_all, get_db
+from .intel import build_export_xlsx, parse_urls
 from .jobs import create_job, requeue_stuck_jobs
 from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, JobStatus, Organization, UsageEvent, User
 from .queue import get_redis
@@ -249,6 +250,51 @@ def extract(
 def batch(payload: BatchRequest, principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)) -> JobResponse:
     job = create_job(db, principal.organization, JobKind.batch, payload.model_dump(mode="json", by_alias=True))
     return job_response(job)
+
+
+INTEL_MAX_BYTES = 2 * 1024 * 1024
+
+
+@app.post("/v1/intel/upload")
+async def intel_upload(
+    file: UploadFile = File(...),
+    principal: Principal = Depends(require_api_key),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Excel/CSV/TXT dosyasından site listesi alıp toplu analiz job'u başlat."""
+    rate_limit(f"intel:{principal.organization.id}", limit=10, window_seconds=60)
+    content = await file.read(INTEL_MAX_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="Dosya boş")
+    if len(content) > INTEL_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Dosya çok büyük (maksimum 2 MB)")
+    try:
+        urls = parse_urls(file.filename or "liste.txt", content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    if not urls:
+        raise HTTPException(
+            status_code=422,
+            detail="Dosyada geçerli site adresi bulunamadı. Her satıra bir adres (örn. firma.com veya https://firma.com) ekleyin.",
+        )
+    job = create_job(db, principal.organization, JobKind.intel, {"urls": urls})
+    return {"job_id": job.id, "url_count": len(urls), "status": job.status, "credits": job.credits}
+
+
+@app.get("/v1/intel/{job_id}/export")
+def intel_export(job_id: str, principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)) -> Response:
+    """Tamamlanan toplu analiz job'unun Excel çıktısını indir."""
+    job = db.get(Job, job_id)
+    if job is None or job.organization_id != principal.organization.id or job.kind != JobKind.intel.value:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != JobStatus.succeeded.value:
+        raise HTTPException(status_code=409, detail=f"Analiz henüz tamamlanmadı (durum: {job.status})")
+    data = build_export_xlsx((job.result or {}).get("items") or [])
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="firma-analiz-sonuclari.xlsx"'},
+    )
 
 
 @app.post("/v1/playground/scrape")

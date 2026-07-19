@@ -10,6 +10,7 @@ BASE_CREDITS = {
     JobKind.extract.value: 4,
     JobKind.crawl.value: 5,
     JobKind.batch.value: 1,
+    JobKind.intel.value: 2,
 }
 
 
@@ -31,6 +32,8 @@ def estimate_credits(kind: str, payload: dict) -> int:
         credits += max(1, int(payload.get("limit", 25)) // 10)
     if kind == JobKind.batch.value:
         credits *= len(payload.get("urls", []))
+    if kind == JobKind.intel.value:
+        credits *= max(1, len(payload.get("urls", [])))
     return max(1, credits)
 
 
