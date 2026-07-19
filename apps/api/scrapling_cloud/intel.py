@@ -158,7 +158,7 @@ def extract_socials(links: list | None, markdown: str | None = None, site_host: 
     for href in candidates:
         low = href.lower()
         host = re.sub(r"^https?://(www\.)?", "", low).split("/")[0]
-        if own and host == own:
+        if own and (host == own or host.endswith("." + own)):
             continue
         for key, domains in SOCIAL_DOMAINS:
             if key in found:
