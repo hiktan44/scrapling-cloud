@@ -12,6 +12,12 @@ RUN npm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Bind to all interfaces: the container sits on two Docker networks (compose +
+# coolify proxy) and Traefik may connect via either one. Without this, Next.js
+# standalone binds to the container-ID hostname (a single interface) and the
+# proxy intermittently gets connection refused -> 502.
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
