@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import threading
 import time
 from traceback import format_exc
@@ -74,12 +75,13 @@ async def _run(job_id: str) -> None:
             async def process_url(index: int, target_url: str) -> None:
                 nonlocal completed
                 item = {"url": target_url, "status": "ok", "socials": {}, "analysis": "", "error": None}
+                site_host = re.sub(r"^https?://(www\.)?", "", target_url.lower()).split("/")[0]
                 try:
                     async with semaphore:
                         scraped = await scrape_url(
                             {"url": target_url, "formats": ["markdown", "links", "metadata"], "mode": mode}
                         )
-                        item["socials"] = extract_socials(scraped.get("links") or [], scraped.get("markdown"))
+                        item["socials"] = extract_socials(scraped.get("links") or [], scraped.get("markdown"), site_host)
                         item["analysis"] = await analyze_company(scraped)
                 except Exception as exc:
                     item["status"] = "error"

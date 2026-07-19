@@ -28,7 +28,7 @@ SOCIAL_DOMAINS: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 # Profil sayfası olmayan paylaşım/yardımcı bağlantılarını ele
-SOCIAL_BAD_PATHS = ("sharer", "/share", "/intent/", "/plugins/", "/dialog/", "hashtag", "/embed/")
+SOCIAL_BAD_PATHS = ("sharer", "/share", "/intent/", "/plugins/", "/dialog/", "hashtag", "/embed/", "/watch")
 
 INTEL_PROMPT = (
     "Sen bir B2B pazar araştırması analistisin. Aşağıdaki web sitesi içeriğini incele ve "
@@ -137,12 +137,14 @@ def _clean_social_url(href: str) -> str | None:
     return cleaned
 
 
-def extract_socials(links: list | None, markdown: str | None = None) -> dict[str, str]:
+def extract_socials(links: list | None, markdown: str | None = None, site_host: str | None = None) -> dict[str, str]:
     """Sayfadaki bağlantılardan sosyal medya profil URL'lerini çıkar.
 
     `links` scraper çıktısı olarak düz URL stringleri (veya {"href": ...}
-    sözlükleri) içerebilir; ikisi de desteklenir.
+    sözlükleri) içerebilir; ikisi de desteklenir. `site_host` verilirse
+    sitenin kendi domain'ine giden bağlantılar sosyal sayılmaz.
     """
+    own = (site_host or "").lower().removeprefix("www.")
     candidates: list[str] = []
     for link in links or []:
         href = link if isinstance(link, str) else ((link or {}).get("href") or "")
@@ -152,15 +154,30 @@ def extract_socials(links: list | None, markdown: str | None = None) -> dict[str
         candidates.extend(URL_RE.findall(markdown)[:500])
 
     found: dict[str, str] = {}
+    roots: dict[str, str] = {}
     for href in candidates:
         low = href.lower()
+        host = re.sub(r"^https?://(www\.)?", "", low).split("/")[0]
+        if own and host == own:
+            continue
         for key, domains in SOCIAL_DOMAINS:
             if key in found:
                 continue
             if any(d in low for d in domains):
                 cleaned = _clean_social_url(href)
-                if cleaned:
+                if not cleaned:
+                    break
+                path = re.sub(r"^https?://[^/]+", "", cleaned).strip("/")
+                if path:
+                    # Gerçek profil bağlantısı - her zaman kök bağlantıya tercih edilir
                     found[key] = cleaned
+                    roots.pop(key, None)
+                elif key not in roots:
+                    # Platform kökü (örn. github.com) - daha iyi aday gelmezse kullanılır
+                    roots[key] = cleaned
+                break
+    for key, url in roots.items():
+        found.setdefault(key, url)
     return found
 
 
