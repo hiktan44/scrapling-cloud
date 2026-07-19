@@ -117,8 +117,8 @@ export default function BatchPage() {
       setError("Desteklenen formatlar: .xlsx, .csv veya .txt");
       return;
     }
-    if (candidate.size > 2 * 1024 * 1024) {
-      setError("Dosya çok büyük (maksimum 2 MB).");
+    if (candidate.size > 25 * 1024 * 1024) {
+      setError("Dosya çok büyük (maksimum 25 MB).");
       return;
     }
     setFile(candidate);
@@ -158,7 +158,7 @@ export default function BatchPage() {
   }
 
   async function pollJob(jobId: string, urlCount: number) {
-    for (let attempt = 0; attempt < 150; attempt += 1) {
+    for (let attempt = 0; attempt < 600; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 4000));
       const detail = await apiFetch<JobDetail>(`/v1/jobs/${jobId}`);
       setJob(detail);
@@ -274,7 +274,7 @@ export default function BatchPage() {
             >
               <UploadCloud size={30} />
               <strong>Dosyayı buraya sürükle veya seç</strong>
-              <span>.xlsx, .csv veya .txt · maks 2 MB · 50 siteye kadar</span>
+              <span>.xlsx, .csv veya .txt · maks 25 MB · 1000 siteye kadar</span>
               <input
                 ref={inputRef}
                 type="file"

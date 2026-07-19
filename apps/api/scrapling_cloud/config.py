@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     zai_api_key: str | None = None
     zai_base_url: str = "https://api.z.ai/api/paas/v4"
     zai_model: str = "glm-5.1"
+    kimi_api_key: str | None = None
+    moonshot_api_key: str | None = None
+    kimi_base_url: str = "https://api.moonshot.ai/v1"
+    kimi_model: str = "kimi-k2.5"
     proxy_provider_url: str | None = None
     proxy_provider_token: str | None = None
     # Secure-by-default: behave like production unless ENVIRONMENT says

@@ -252,7 +252,7 @@ def batch(payload: BatchRequest, principal: Principal = Depends(require_api_key)
     return job_response(job)
 
 
-INTEL_MAX_BYTES = 2 * 1024 * 1024
+INTEL_MAX_BYTES = 25 * 1024 * 1024
 
 
 @app.post("/v1/intel/upload")
@@ -267,7 +267,7 @@ async def intel_upload(
     if not content:
         raise HTTPException(status_code=400, detail="Dosya boş")
     if len(content) > INTEL_MAX_BYTES:
-        raise HTTPException(status_code=413, detail="Dosya çok büyük (maksimum 2 MB)")
+        raise HTTPException(status_code=413, detail="Dosya çok büyük (maksimum 25 MB)")
     try:
         urls = parse_urls(file.filename or "liste.txt", content)
     except ValueError as exc:

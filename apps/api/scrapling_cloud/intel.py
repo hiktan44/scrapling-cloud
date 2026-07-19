@@ -9,8 +9,8 @@ import re
 
 from .analyzer import extract_with_prompt
 
-MAX_URLS = 50
-MAX_ROWS = 5000
+MAX_URLS = 1000
+MAX_ROWS = 50000
 
 URL_RE = re.compile(r"https?://[^\s,\"'<>\)\]]+", re.IGNORECASE)
 

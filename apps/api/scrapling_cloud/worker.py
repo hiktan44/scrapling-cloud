@@ -68,7 +68,7 @@ async def _run(job_id: str) -> None:
         elif job.kind == JobKind.intel.value:
             urls = [str(target) for target in (job.request.get("urls") or [])]
             items: list[dict | None] = [None] * len(urls)
-            semaphore = asyncio.Semaphore(4)
+            semaphore = asyncio.Semaphore(6)
             completed = 0
             mode = job.request.get("mode", "static")
 

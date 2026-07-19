@@ -98,6 +98,11 @@ def z_ai_key() -> str | None:
     return clean_api_key(settings.z_ai_api_key) or clean_api_key(settings.zai_api_key)
 
 
+def kimi_key() -> str | None:
+    settings = get_settings()
+    return clean_api_key(settings.kimi_api_key) or clean_api_key(settings.moonshot_api_key)
+
+
 async def call_zai_chat(system: str, corpus: dict[str, Any]) -> dict:
     settings = get_settings()
     base_url = settings.zai_base_url.rstrip("/")
@@ -126,6 +131,37 @@ async def call_zai_chat(system: str, corpus: dict[str, Any]) -> dict:
     parsed["enabled"] = True
     parsed["provider"] = "zai"
     parsed["model"] = settings.zai_model
+    return parsed
+
+
+async def call_kimi_chat(system: str, corpus: dict[str, Any]) -> dict:
+    """Moonshot Kimi API (OpenAI-compatible chat completions)."""
+    settings = get_settings()
+    base_url = settings.kimi_base_url.rstrip("/")
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(
+            f"{base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {kimi_key()}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": settings.kimi_model,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": json.dumps(corpus, ensure_ascii=False)},
+                ],
+                "temperature": 0.2,
+                "max_tokens": 2400,
+            },
+        )
+        response.raise_for_status()
+    data = response.json()
+    content = data["choices"][0]["message"]["content"]
+    parsed = parse_json_response(content)
+    parsed["enabled"] = True
+    parsed["provider"] = "kimi"
+    parsed["model"] = settings.kimi_model
     return parsed
 
 
@@ -163,6 +199,8 @@ async def analyze_crawl(pages: list[dict], root_url: str, instruction: str | Non
         return fallback_analysis(pages, "Z_AI_API_KEY is not configured", instruction, records)
     if provider == "openai" and not settings.openai_api_key:
         return fallback_analysis(pages, "OPENAI_API_KEY is not configured", instruction, records)
+    if provider == "kimi" and not kimi_key():
+        return fallback_analysis(pages, "KIMI_API_KEY is not configured", instruction, records)
 
     corpus = {
         "root_url": root_url,
@@ -180,6 +218,8 @@ async def analyze_crawl(pages: list[dict], root_url: str, instruction: str | Non
             parsed = await call_zai_chat(system, corpus)
         elif provider == "openai":
             parsed = await call_openai_responses(system, corpus)
+        elif provider == "kimi":
+            parsed = await call_kimi_chat(system, corpus)
         else:
             return fallback_analysis(pages, f"Unsupported LLM_PROVIDER: {settings.llm_provider}", instruction, records)
         parsed["prompt"] = instruction
@@ -203,6 +243,8 @@ async def extract_with_prompt(scrape_result: dict, prompt: str) -> dict:
         return {"enabled": False, "provider": "fallback", "reason": "Z_AI_API_KEY is not configured", "data": basic, "prompt": prompt}
     if provider == "openai" and not settings.openai_api_key:
         return {"enabled": False, "provider": "fallback", "reason": "OPENAI_API_KEY is not configured", "data": basic, "prompt": prompt}
+    if provider == "kimi" and not kimi_key():
+        return {"enabled": False, "provider": "fallback", "reason": "KIMI_API_KEY is not configured", "data": basic, "prompt": prompt}
 
     corpus = {
         "url": scrape_result.get("url"),
@@ -220,6 +262,8 @@ async def extract_with_prompt(scrape_result: dict, prompt: str) -> dict:
             parsed = await call_zai_chat(system, corpus)
         elif provider == "openai":
             parsed = await call_openai_responses(system, corpus)
+        elif provider == "kimi":
+            parsed = await call_kimi_chat(system, corpus)
         else:
             return {"enabled": False, "provider": "fallback", "reason": f"Unsupported LLM_PROVIDER: {settings.llm_provider}", "data": basic, "prompt": prompt}
         parsed["prompt"] = prompt
