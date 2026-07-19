@@ -265,29 +265,33 @@ async def analyze_company(scrape_result: dict) -> str:
 
 
 def build_export_xlsx(items: list[dict]) -> bytes:
-    """Sonuçları indirilebilir Excel dosyasına dönüştür."""
+    """Sonuçları renkli, tıklanabilir linkli Excel dosyasına dönüştür."""
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
 
+    HEADER_GREEN = "2F5B4C"   # temel sütunlar
+    HEADER_ORANGE = "C46A2B"  # zenginleştirilmiş sütunlar
+    LINK_FONT = Font(color="0563C1", underline="single")
+
     wb = Workbook()
     ws = wb.active
-    ws.title = "Firma Analizi"
+    ws.title = "Firmalar"
 
     headers = ["URL", "Durum", "Instagram", "Facebook", "X", "LinkedIn", "YouTube",
                "TikTok", "WhatsApp", "Telegram", "Pinterest", "GitHub", "Firma Analizi", "Hata"]
     ws.append(headers)
 
-    header_fill = PatternFill("solid", fgColor="111827")
-    header_font = Font(bold=True, color="FFFFFF")
+    base_cols = {1, 2}  # URL, Durum yeşil; gerisi turuncu
     for col, _ in enumerate(headers, start=1):
         c = ws.cell(row=1, column=col)
-        c.fill = header_fill
-        c.font = header_font
-        c.alignment = Alignment(vertical="center")
+        c.fill = PatternFill("solid", fgColor=HEADER_GREEN if col in base_cols else HEADER_ORANGE)
+        c.font = Font(bold=True, color="FFFFFF")
+        c.alignment = Alignment(vertical="center", wrap_text=True)
 
     social_keys = ["instagram", "facebook", "x", "linkedin", "youtube", "tiktok",
                    "whatsapp", "telegram", "pinterest", "github"]
+    link_cols = {1} | set(range(3, 13))  # URL + sosyal sütunlar tıklanabilir
     for item in items:
         socials = item.get("socials") or {}
         row = [item.get("url") or "", "Başarılı" if item.get("status") == "ok" else "Hata"]
@@ -295,6 +299,14 @@ def build_export_xlsx(items: list[dict]) -> bytes:
         row.append(item.get("analysis") or "")
         row.append(item.get("error") or "")
         ws.append(row)
+
+    for r in range(2, ws.max_row + 1):
+        for c in link_cols:
+            cell = ws.cell(row=r, column=c)
+            value = cell.value
+            if value and str(value).startswith(("http://", "https://")):
+                cell.hyperlink = str(value)
+                cell.font = LINK_FONT
 
     widths = [38, 10, 30, 30, 26, 34, 30, 28, 24, 26, 28, 28, 70, 28]
     for i, w in enumerate(widths, start=1):
