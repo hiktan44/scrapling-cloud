@@ -356,6 +356,10 @@ def get_job(job_id: str, principal: Principal = Depends(require_api_key), db: Se
     )
 
 
+SSE_MAX_SECONDS = 600
+SSE_POLL_SECONDS = 2
+
+
 @app.get("/v1/jobs/{job_id}/events")
 def job_events(job_id: str, principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)) -> StreamingResponse:
     job = db.get(Job, job_id)
@@ -363,9 +367,34 @@ def job_events(job_id: str, principal: Principal = Depends(require_api_key), db:
         raise HTTPException(status_code=404, detail="Job not found")
 
     def event_stream():
-        events = db.scalars(select(JobEvent).where(JobEvent.job_id == job_id).order_by(JobEvent.created_at)).all()
-        for event in events:
-            yield f"event: {event.level}\ndata: {event.message}\n\n"
+        import time as _time
+
+        from .db import SessionLocal
+
+        sent: set[str] = set()
+        deadline = _time.time() + SSE_MAX_SECONDS
+        while _time.time() < deadline:
+            session = SessionLocal()
+            try:
+                events = session.scalars(select(JobEvent).where(JobEvent.job_id == job_id).order_by(JobEvent.created_at)).all()
+                for event in events:
+                    if event.id in sent:
+                        continue
+                    sent.add(event.id)
+                    payload = json.dumps(
+                        {"level": event.level, "message": event.message, "data": event.data, "at": event.created_at.isoformat()},
+                        ensure_ascii=False,
+                        default=str,
+                    )
+                    yield f"event: {event.level}\ndata: {payload}\n\n"
+                current = session.get(Job, job_id)
+                if current is None or current.status in (JobStatus.succeeded.value, JobStatus.failed.value, JobStatus.canceled.value):
+                    yield f"event: done\ndata: {json.dumps({'status': current.status if current else 'unknown'})}\n\n"
+                    return
+            finally:
+                session.close()
+            _time.sleep(SSE_POLL_SECONDS)
+        yield f"event: timeout\ndata: {json.dumps({'status': 'still-running'})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 

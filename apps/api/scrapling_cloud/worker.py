@@ -7,11 +7,12 @@ from traceback import format_exc
 
 from rq import Worker
 
-from .analyzer import extract_with_prompt, extract_with_schema
+from .analyzer import extract_multi, extract_with_prompt, extract_with_schema
 from .db import SessionLocal
 from .intel import analyze_company, extract_socials, social_for_url
 from .jobs import mark_failed, mark_running, mark_succeeded, requeue_stuck_jobs, send_webhook
 from .learning import record_failure, record_success
+from .tracking import compute_change
 from .models import Job, JobEvent, JobKind, JobStatus
 from .queue import get_queue, get_redis
 from .scraper import crawl_url, map_url, scrape_url
@@ -46,16 +47,75 @@ async def _run(job_id: str) -> None:
         mark_running(db, job)
 
         if job.kind == JobKind.scrape.value:
-            result = await scrape_url(job.request)
+            payload = dict(job.request)
+            if payload.get("change_tracking"):
+                formats = list(payload.get("formats") or ["markdown"])
+                if "markdown" not in formats:
+                    formats.append("markdown")
+                payload["formats"] = formats
+            result = await scrape_url(payload)
+            if payload.get("change_tracking"):
+                result["change_tracking"] = compute_change(
+                    db,
+                    job.organization_id,
+                    str(payload.get("url")),
+                    result.get("markdown") or "",
+                    payload.get("change_tracking_tag") or "",
+                )
+                db.commit()
         elif job.kind == JobKind.extract.value:
             payload = dict(job.request)
-            payload["formats"] = ["json", "metadata", "markdown"]
-            result = await scrape_url(payload)
             prompt = payload.get("prompt") or payload.get("instructions")
-            if payload.get("schema"):
-                result["extraction"] = await extract_with_schema(result, payload["schema"], prompt)
-            elif prompt:
-                result["extraction"] = await extract_with_prompt(result, prompt)
+            targets = [str(target) for target in (payload.get("urls") or [])]
+            if not targets and payload.get("url"):
+                targets = [str(payload["url"])]
+
+            expand_limit = int(payload.get("limit") or 10)
+            expanded: list[str] = []
+            for target in targets:
+                if target.endswith("/*"):
+                    mapped = await map_url({"url": target[:-2], "limit": expand_limit})
+                    expanded.extend(mapped.get("links") or [])
+                else:
+                    expanded.append(target)
+            urls = list(dict.fromkeys(expanded))[:20]
+
+            if len(urls) <= 1:
+                single = dict(payload)
+                if urls:
+                    single["url"] = urls[0]
+                single["formats"] = ["json", "metadata", "markdown"]
+                result = await scrape_url(single)
+                if payload.get("schema"):
+                    result["extraction"] = await extract_with_schema(result, payload["schema"], prompt)
+                elif prompt:
+                    result["extraction"] = await extract_with_prompt(result, prompt)
+            else:
+                extract_semaphore = asyncio.Semaphore(5)
+                extract_pages: list[dict | None] = [None] * len(urls)
+
+                async def scrape_extract_url(index: int, target_url: str) -> None:
+                    try:
+                        async with extract_semaphore:
+                            page = await scrape_url({"url": target_url, "formats": ["markdown", "metadata"], "mode": payload.get("mode", "static")})
+                        page["status"] = "ok"
+                    except Exception as exc:
+                        page = {"url": target_url, "status": "error", "error": str(exc)[:300]}
+                    extract_pages[index] = page
+                    db.add(JobEvent(job_id=job.id, message=f"Extract {index + 1}/{len(urls)}: {target_url}", data={"status": page["status"]}))
+                    db.commit()
+
+                await asyncio.gather(*(scrape_extract_url(index, target_url) for index, target_url in enumerate(urls)))
+                scraped_ok = [page for page in extract_pages if page and page.get("status") == "ok"]
+                result = {
+                    "urls": urls,
+                    "pages": [
+                        {"url": page.get("url"), "status": page.get("status"), "title": (page.get("metadata") or {}).get("title"), "error": page.get("error")}
+                        for page in extract_pages
+                        if page
+                    ],
+                    "extraction": await extract_multi(scraped_ok, payload.get("schema"), prompt),
+                }
         elif job.kind == JobKind.map.value:
             result = await map_url(job.request)
         elif job.kind == JobKind.crawl.value:

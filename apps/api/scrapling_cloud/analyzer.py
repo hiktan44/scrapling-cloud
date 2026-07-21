@@ -296,6 +296,33 @@ async def extract_with_schema(scrape_result: dict, schema: dict, prompt: str | N
         return {"enabled": False, "provider": "fallback_after_error", "reason": f"LLM extraction failed: {exc}", "data": basic, "schema": True}
 
 
+async def extract_multi(pages: list[dict], schema: dict | None, prompt: str | None) -> dict:
+    """LLM extraction over several scraped pages into a single data object."""
+    corpus = {
+        "pages": [
+            {"url": page.get("url"), "title": (page.get("metadata") or {}).get("title"), "content": str(page.get("markdown") or "")[:4000]}
+            for page in pages[:20]
+        ],
+        "instruction": prompt or "Sayfalardan istenen yapılandırılmış veriyi çıkar.",
+    }
+    if schema:
+        corpus["json_schema"] = schema
+    system = (
+        "Sen bir veri çıkarma asistanısın. Birden çok sayfanın içeriği verildi; hepsini birlikte değerlendirip "
+        "istenen bilgiyi çıkar. Şema verildiyse ona birebir uy, bulunamayan alanlar için null kullan, uydurma "
+        "değer üretme. Sadece geçerli JSON döndür: tek bir 'data' objesi olsun."
+    )
+    try:
+        parsed = await _call_configured_provider(system, corpus)
+        if parsed is None:
+            return {"enabled": False, "provider": "fallback", "reason": "LLM key is not configured", "data": {}}
+        if not isinstance(parsed.get("data"), dict):
+            parsed["data"] = {}
+        return parsed
+    except Exception as exc:
+        return {"enabled": False, "provider": "fallback_after_error", "reason": f"LLM extraction failed: {exc}", "data": {}}
+
+
 async def extract_with_prompt(scrape_result: dict, prompt: str) -> dict:
     """Firecrawl-style prompt extraction: pull structured data out of a
     scraped page using the configured LLM, guided by a natural-language

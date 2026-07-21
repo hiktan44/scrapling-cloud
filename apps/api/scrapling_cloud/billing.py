@@ -32,6 +32,10 @@ def estimate_credits(kind: str, payload: dict) -> int:
         credits += 3
     if kind == JobKind.crawl.value:
         credits += max(1, int(payload.get("limit", 25)) // 10)
+    if kind == JobKind.extract.value:
+        # Multi-URL extraction: +2 credits per additional page target.
+        extra_urls = max(0, len(payload.get("urls") or []) - 1)
+        credits += 2 * extra_urls
     if kind == JobKind.batch.value:
         credits *= len(payload.get("urls", []))
     if kind == JobKind.intel.value:

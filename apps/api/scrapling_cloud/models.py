@@ -118,6 +118,21 @@ class UsageEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class PageSnapshot(Base):
+    """Last-seen markdown per (org, url, tag) - backing store for change tracking."""
+
+    __tablename__ = "page_snapshots"
+    __table_args__ = (UniqueConstraint("organization_id", "url", "tag", name="uq_page_snapshot"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    url: Mapped[str] = mapped_column(String(2000), nullable=False)
+    tag: Mapped[str] = mapped_column(String(80), default="", nullable=False)
+    markdown_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    markdown: Mapped[str] = mapped_column(Text, nullable=False)
+    scraped_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class DomainProfile(Base):
     __tablename__ = "domain_profiles"
     __table_args__ = (UniqueConstraint("organization_id", "domain", name="uq_domain_profile"),)

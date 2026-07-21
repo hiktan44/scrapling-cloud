@@ -24,6 +24,8 @@ class ScrapeRequest(BaseModel):
     store_in_cache: bool = True
     screenshot_full_page: bool = False
     proxy: bool = False
+    change_tracking: bool = False
+    change_tracking_tag: str = Field(default="", max_length=80)
     extraction_schema: dict[str, Any] | None = Field(default=None, alias="schema")
     webhook_url: HttpUrl | None = None
 
@@ -55,11 +57,17 @@ class MapRequest(BaseModel):
 
 
 class ExtractRequest(BaseModel):
-    """Firecrawl-style extraction: send a JSON schema and/or a natural-language prompt."""
+    """Firecrawl-style extraction: send a JSON schema and/or a natural-language prompt.
+
+    Accepts a single `url`, or `urls` with up to 20 entries; entries ending in
+    `/*` are expanded via URL discovery (map) before extraction.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
-    url: HttpUrl
+    url: HttpUrl | None = None
+    urls: list[str] | None = Field(default=None, max_length=20)
+    limit: int = Field(default=10, ge=1, le=20, description="Max pages a wildcard entry expands to.")
     extraction_schema: dict[str, Any] | None = Field(default=None, alias="schema")
     prompt: str | None = Field(default=None, max_length=4000)
     instructions: str | None = Field(default=None, max_length=4000)
@@ -67,9 +75,14 @@ class ExtractRequest(BaseModel):
     webhook_url: HttpUrl | None = None
 
     @model_validator(mode="after")
-    def require_schema_or_prompt(self) -> "ExtractRequest":
+    def require_inputs(self) -> "ExtractRequest":
         if not self.extraction_schema and not (self.prompt or self.instructions):
             raise ValueError("Provide at least one of 'schema' or 'prompt'.")
+        if not self.url and not self.urls:
+            raise ValueError("Provide 'url' or 'urls'.")
+        for entry in self.urls or []:
+            if not entry.startswith(("http://", "https://")):
+                raise ValueError(f"Invalid URL in 'urls': {entry}")
         return self
 
 
