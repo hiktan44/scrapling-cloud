@@ -231,6 +231,71 @@ async def analyze_crawl(pages: list[dict], root_url: str, instruction: str | Non
         return fallback
 
 
+async def _call_configured_provider(system: str, corpus: dict[str, Any]) -> dict | None:
+    """Call the configured LLM provider, or return None when no key is set."""
+    settings = get_settings()
+    provider = settings.llm_provider.lower()
+    if provider == "zai" and z_ai_key():
+        return await call_zai_chat(system, corpus)
+    if provider == "openai" and settings.openai_api_key:
+        return await call_openai_responses(system, corpus)
+    if provider == "kimi" and kimi_key():
+        return await call_kimi_chat(system, corpus)
+    return None
+
+
+async def summarize_page(scrape_result: dict) -> str | None:
+    """One-paragraph LLM summary of a scraped page (Firecrawl `summary` format)."""
+    content = str(scrape_result.get("markdown") or scrape_result.get("text") or "")[:12000]
+    if not content.strip():
+        return None
+    corpus = {"url": scrape_result.get("url"), "content": content}
+    system = (
+        "Sen bir web içerik özetleyicisisin. Verilen sayfa içeriğini tek paragrafta, sayfanın dilinde özetle. "
+        'Sadece geçerli JSON döndür: {"summary": "..."} biçiminde.'
+    )
+    try:
+        parsed = await _call_configured_provider(system, corpus)
+    except Exception:
+        parsed = None
+    if parsed and isinstance(parsed.get("summary"), str):
+        return parsed["summary"]
+    # No LLM available or it misbehaved: fall back to the page's own lead text.
+    plain = " ".join(content.split())
+    return plain[:500] or None
+
+
+async def extract_with_schema(scrape_result: dict, schema: dict, prompt: str | None = None) -> dict:
+    """LLM extraction guided by a JSON Schema (Firecrawl json-format parity).
+
+    Falls back to the CSS-selector extraction already present in
+    scrape_result['json'] when no LLM key is configured.
+    """
+    basic = scrape_result.get("json") or {}
+    corpus = {
+        "url": scrape_result.get("url"),
+        "metadata": scrape_result.get("metadata"),
+        "content": str(scrape_result.get("markdown") or scrape_result.get("text") or "")[:12000],
+        "json_schema": schema,
+        "instruction": prompt or "Şemadaki alanları sayfa içeriğinden doldur.",
+    }
+    system = (
+        "Sen bir veri çıkarma asistanısın. Verilen JSON Schema'ya birebir uyan bir obje üret; alan adlarını "
+        "değiştirme, şemada olmayan alan ekleme. Bulunamayan alanlar için null kullan, uydurma değer üretme. "
+        "Sadece geçerli JSON döndür: tek bir 'data' objesi içinde şemaya uyan veri olsun."
+    )
+    try:
+        parsed = await _call_configured_provider(system, corpus)
+        if parsed is None:
+            return {"enabled": False, "provider": "fallback", "reason": "LLM key is not configured", "data": basic, "schema": True}
+        if not isinstance(parsed.get("data"), dict):
+            parsed["data"] = basic
+        parsed["schema"] = True
+        return parsed
+    except Exception as exc:
+        return {"enabled": False, "provider": "fallback_after_error", "reason": f"LLM extraction failed: {exc}", "data": basic, "schema": True}
+
+
 async def extract_with_prompt(scrape_result: dict, prompt: str) -> dict:
     """Firecrawl-style prompt extraction: pull structured data out of a
     scraped page using the configured LLM, guided by a natural-language

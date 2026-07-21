@@ -10,10 +10,14 @@ async def test_crawl_follows_same_site_links(monkeypatch) -> None:
         "https://example.com/next": "<html><head><title>Next</title></head><body>Deep text</body></html>",
     }
 
-    async def fake_fetch(url: str, mode: str = "static", wait_for: str | None = None, proxy: str | None = None) -> str:
+    async def fake_fetch(url: str, *args, **kwargs) -> str:
         return pages[url]
 
+    async def no_robots(root_url: str):
+        return None
+
     monkeypatch.setattr(scraper, "fetch_html", fake_fetch)
+    monkeypatch.setattr(scraper, "_load_robots", no_robots)
     result = await scraper.crawl_url({"url": "https://example.com/start", "limit": 5, "max_depth": 2})
 
     assert result["pages_scraped"] == 2

@@ -24,6 +24,8 @@ def estimate_credits(kind: str, payload: dict) -> int:
         credits += 8
     if "screenshot" in formats:
         credits += 3
+    if "summary" in formats:
+        credits += 4
     if payload.get("schema"):
         credits += 3
     if payload.get("ai_extract"):

@@ -7,7 +7,7 @@ from traceback import format_exc
 
 from rq import Worker
 
-from .analyzer import extract_with_prompt
+from .analyzer import extract_with_prompt, extract_with_schema
 from .db import SessionLocal
 from .intel import analyze_company, extract_socials, social_for_url
 from .jobs import mark_failed, mark_running, mark_succeeded, requeue_stuck_jobs, send_webhook
@@ -52,18 +52,46 @@ async def _run(job_id: str) -> None:
             payload["formats"] = ["json", "metadata", "markdown"]
             result = await scrape_url(payload)
             prompt = payload.get("prompt") or payload.get("instructions")
-            if prompt and not payload.get("schema"):
+            if payload.get("schema"):
+                result["extraction"] = await extract_with_schema(result, payload["schema"], prompt)
+            elif prompt:
                 result["extraction"] = await extract_with_prompt(result, prompt)
         elif job.kind == JobKind.map.value:
             result = await map_url(job.request)
         elif job.kind == JobKind.crawl.value:
             result = await crawl_url(job.request)
         elif job.kind == JobKind.batch.value:
+            urls = [str(url) for url in job.request.get("urls", [])]
+            batch_items: list[dict | None] = [None] * len(urls)
+            batch_semaphore = asyncio.Semaphore(int(job.request.get("max_concurrency") or 5))
+            batch_completed = 0
+
+            async def scrape_batch_url(index: int, target_url: str) -> None:
+                nonlocal batch_completed
+                try:
+                    async with batch_semaphore:
+                        item = await scrape_url(
+                            {
+                                "url": target_url,
+                                "formats": job.request.get("formats", ["markdown"]),
+                                "mode": job.request.get("mode", "static"),
+                                "only_main_content": job.request.get("only_main_content", True),
+                            }
+                        )
+                    item["status"] = "ok"
+                except Exception as exc:
+                    item = {"url": target_url, "status": "error", "error": str(exc)[:300]}
+                batch_items[index] = item
+                batch_completed += 1
+                db.add(JobEvent(job_id=job.id, message=f"Batch {batch_completed}/{len(urls)}: {target_url}", data={"status": item["status"]}))
+                db.commit()
+
+            await asyncio.gather(*(scrape_batch_url(index, target_url) for index, target_url in enumerate(urls)))
+            finished_items = [entry for entry in batch_items if entry is not None]
             result = {
-                "items": [
-                    await scrape_url({"url": str(url), "formats": job.request.get("formats", ["markdown"]), "mode": job.request.get("mode", "static")})
-                    for url in job.request.get("urls", [])
-                ]
+                "items": finished_items,
+                "total": len(urls),
+                "succeeded": sum(1 for entry in finished_items if entry.get("status") == "ok"),
             }
         elif job.kind == JobKind.intel.value:
             urls = [str(target) for target in (job.request.get("urls") or [])]

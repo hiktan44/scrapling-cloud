@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import re
+import urllib.robotparser
 import xml.etree.ElementTree as ElementTree
 from collections import deque
 from urllib.parse import parse_qs, unquote, urldefrag, urljoin, urlparse
@@ -9,7 +11,8 @@ from urllib.parse import parse_qs, unquote, urldefrag, urljoin, urlparse
 from bs4 import BeautifulSoup
 from markdownify import markdownify as to_markdown
 
-from .analyzer import analyze_crawl
+from .analyzer import analyze_crawl, summarize_page
+from .cache import cache_get, cache_set
 from .config import get_settings
 
 
@@ -76,10 +79,20 @@ def resolve_proxy(payload: dict) -> str | None:
     return None
 
 
+def _pattern_matches(pattern: str, url: str) -> bool:
+    """Match a crawl filter pattern as regex, falling back to substring."""
+    try:
+        if re.search(pattern, url):
+            return True
+    except re.error:
+        pass
+    return pattern in url
+
+
 def allowed_by_patterns(url: str, include: list[str], exclude: list[str]) -> bool:
-    if include and not any(pattern in url for pattern in include):
+    if include and not any(_pattern_matches(pattern, url) for pattern in include):
         return False
-    if exclude and any(pattern in url for pattern in exclude):
+    if exclude and any(_pattern_matches(pattern, url) for pattern in exclude):
         return False
     return True
 
@@ -173,8 +186,37 @@ def _metadata(html: str) -> dict:
 FETCH_STATIC_TIMEOUT = 45
 FETCH_DYNAMIC_TIMEOUT = 90
 
+MOBILE_USER_AGENT = (
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+)
 
-async def fetch_html(url: str, mode: str = "static", wait_for: str | None = None, proxy: str | None = None) -> str:
+
+def _request_headers(payload: dict) -> dict[str, str] | None:
+    headers = dict(payload.get("headers") or {})
+    if payload.get("mobile") and not any(key.lower() == "user-agent" for key in headers):
+        headers["User-Agent"] = MOBILE_USER_AGENT
+    return {str(k): str(v) for k, v in list(headers.items())[:20]} or None
+
+
+def _request_timeouts(payload: dict) -> tuple[int, int]:
+    """(static_timeout, dynamic_timeout) seconds, honoring the request override."""
+    override = payload.get("timeout")
+    if override:
+        bounded = max(5, min(int(override), 300))
+        return bounded, bounded
+    return FETCH_STATIC_TIMEOUT, FETCH_DYNAMIC_TIMEOUT
+
+
+async def fetch_html(
+    url: str,
+    mode: str = "static",
+    wait_for: str | None = None,
+    proxy: str | None = None,
+    headers: dict[str, str] | None = None,
+    static_timeout: int = FETCH_STATIC_TIMEOUT,
+    dynamic_timeout: int = FETCH_DYNAMIC_TIMEOUT,
+) -> str:
     if mode in {"dynamic", "stealth"}:
         try:
             from scrapling.fetchers import StealthyFetcher, DynamicFetcher
@@ -187,18 +229,27 @@ async def fetch_html(url: str, mode: str = "static", wait_for: str | None = None
                     kwargs["wait_selector"] = wait_for
                 if proxy:
                     kwargs["proxy"] = proxy
-                try:
-                    page = fetcher.fetch(url, **kwargs)
-                except TypeError:
-                    # Older Scrapling fetcher signatures without proxy support.
-                    kwargs.pop("proxy", None)
-                    page = fetcher.fetch(url, **kwargs)
+                if headers:
+                    kwargs["extra_headers"] = headers
+                while True:
+                    try:
+                        page = fetcher.fetch(url, **kwargs)
+                        break
+                    except TypeError:
+                        # Older Scrapling fetcher signatures - drop optional
+                        # kwargs one at a time until the call is accepted.
+                        for optional in ("extra_headers", "proxy"):
+                            if optional in kwargs:
+                                kwargs.pop(optional)
+                                break
+                        else:
+                            raise
                 return str(page.html)
 
             # Scrapling fetchers are synchronous and have no reliable socket
             # timeout; run them in a thread and bound the wait so a drip-feeding
             # or fingerprint-stalling site cannot hang the worker forever.
-            return await asyncio.wait_for(asyncio.to_thread(_render), timeout=FETCH_DYNAMIC_TIMEOUT)
+            return await asyncio.wait_for(asyncio.to_thread(_render), timeout=dynamic_timeout)
         except Exception:
             # Fall through to static fetching so the API remains useful without
             # browser dependencies during local smoke tests.
@@ -207,15 +258,15 @@ async def fetch_html(url: str, mode: str = "static", wait_for: str | None = None
     try:
         from scrapling.fetchers import Fetcher
 
-        if not proxy:
-            page = await asyncio.wait_for(asyncio.to_thread(Fetcher.fetch, url), timeout=FETCH_STATIC_TIMEOUT)
+        if not proxy and not headers:
+            page = await asyncio.wait_for(asyncio.to_thread(Fetcher.fetch, url), timeout=static_timeout)
             return str(page.html)
     except Exception:
         pass
 
     import httpx
 
-    async with httpx.AsyncClient(timeout=25, follow_redirects=True, proxy=proxy) as client:
+    async with httpx.AsyncClient(timeout=min(static_timeout, 60), follow_redirects=True, proxy=proxy, headers=headers) as client:
         response = await client.get(url)
         response.raise_for_status()
         return response.text
@@ -268,27 +319,88 @@ def main_content_html(html: str) -> str:
     return str(root)
 
 
+def _extract_images(html: str, base_url: str, limit: int = 200) -> list[str]:
+    soup = BeautifulSoup(html, "html.parser")
+    images: list[str] = []
+    for tag in soup.find_all("img"):
+        source = tag.get("src") or (tag.get("srcset") or "").split(",")[0].strip().split(" ")[0]
+        if not source or source.startswith("data:"):
+            continue
+        absolute = urljoin(base_url, source)
+        if absolute not in images:
+            images.append(absolute)
+        if len(images) >= limit:
+            break
+    return images
+
+
+def apply_tag_filters(html: str, include_tags: list[str], exclude_tags: list[str]) -> str:
+    """CSS-selector content filtering (Firecrawl includeTags/excludeTags)."""
+    if not include_tags and not exclude_tags:
+        return html
+    soup = BeautifulSoup(html, "html.parser")
+    if include_tags:
+        kept: list[str] = []
+        for selector in include_tags:
+            try:
+                kept.extend(str(node) for node in soup.select(selector))
+            except Exception:
+                continue
+        return "\n".join(kept)
+    for selector in exclude_tags:
+        try:
+            for node in soup.select(selector):
+                node.decompose()
+        except Exception:
+            continue
+    return str(soup)
+
+
 async def scrape_url(payload: dict) -> dict:
     url = str(payload["url"])
+
+    cached = cache_get(payload)
+    if cached is not None:
+        return cached
+
     proxy = resolve_proxy(payload)
-    html = await fetch_html(url, payload.get("mode", "static"), payload.get("wait_for"), proxy)
+    headers = _request_headers(payload)
+    static_timeout, dynamic_timeout = _request_timeouts(payload)
+    html = await fetch_html(
+        url,
+        payload.get("mode", "static"),
+        payload.get("wait_for"),
+        proxy,
+        headers,
+        static_timeout,
+        dynamic_timeout,
+    )
     formats = payload.get("formats") or ["markdown"]
     result: dict = {"url": url}
 
-    # Firecrawl-style onlyMainContent: markdown/text come from the reduced
-    # page, while html/links/metadata always see the full document.
+    # Firecrawl-style onlyMainContent: markdown/text/summary come from the
+    # reduced page, while html/raw_html/links/metadata see the full document.
     content_html = main_content_html(html) if payload.get("only_main_content", True) else html
+    content_html = apply_tag_filters(content_html, payload.get("include_tags") or [], payload.get("exclude_tags") or [])
 
     if "html" in formats:
         result["html"] = html
-    if "markdown" in formats:
-        result["markdown"] = to_markdown(content_html, heading_style="ATX")
+    if "raw_html" in formats:
+        result["raw_html"] = html
+    if "markdown" in formats or "summary" in formats:
+        markdown = to_markdown(content_html, heading_style="ATX")
+        if "markdown" in formats:
+            result["markdown"] = markdown
     if "text" in formats:
         result["text"] = BeautifulSoup(content_html, "html.parser").get_text("\n", strip=True)
     if "links" in formats:
         result["links"] = _extract_links(html, url)
+    if "images" in formats:
+        result["images"] = _extract_images(html, url)
     if "metadata" in formats:
         result["metadata"] = _metadata(html)
+    if "summary" in formats:
+        result["summary"] = await summarize_page({"url": url, "markdown": markdown})
     if "screenshot" in formats:
         try:
             result["screenshot"] = await capture_screenshot(
@@ -302,6 +414,8 @@ async def scrape_url(payload: dict) -> dict:
             result.setdefault("warnings", []).append(f"Screenshot capture failed: {exc}")
     if "json" in formats or payload.get("schema"):
         result["json"] = simple_extract(html, payload.get("schema") or {})
+
+    cache_set(payload, result)
     return result
 
 
@@ -424,6 +538,23 @@ async def map_url(payload: dict) -> dict:
     }
 
 
+async def _load_robots(root_url: str) -> urllib.robotparser.RobotFileParser | None:
+    parsed = urlparse(root_url)
+    robots_text = await _fetch_text(f"{parsed.scheme}://{parsed.netloc}/robots.txt", timeout=10)
+    if not robots_text:
+        return None
+    parser = urllib.robotparser.RobotFileParser()
+    parser.parse(robots_text.splitlines())
+    return parser
+
+
+def _dedupe_key(url: str, ignore_query: bool) -> str:
+    if not ignore_query:
+        return url
+    parsed = urlparse(url)
+    return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+
+
 async def crawl_url(payload: dict) -> dict:
     root_url = str(payload["url"])
     limit = int(payload.get("limit", 25))
@@ -432,24 +563,41 @@ async def crawl_url(payload: dict) -> dict:
     mode = payload.get("mode", "static")
     include = payload.get("include") or []
     exclude = payload.get("exclude") or []
+    delay = min(float(payload.get("delay") or 0), 30.0)
+    ignore_query = bool(payload.get("ignore_query_parameters"))
+    in_scope = same_or_subdomain if payload.get("allow_subdomains") else same_site
+    only_main_content = payload.get("only_main_content", True)
+
+    robots = None
+    if payload.get("respect_robots", True):
+        robots = await _load_robots(root_url)
 
     queue = deque([(root_url, 0)])
     seen: set[str] = set()
     pages: list[dict] = []
     discovered: list[str] = []
     errors: list[dict] = []
+    robots_skipped = 0
 
     while queue and len(pages) < limit:
         current_url, depth = queue.popleft()
-        if current_url in seen:
+        dedupe = _dedupe_key(current_url, ignore_query)
+        if dedupe in seen:
             continue
-        seen.add(current_url)
-        if not same_site(current_url, root_url) or not allowed_by_patterns(current_url, include, exclude):
+        seen.add(dedupe)
+        if not in_scope(current_url, root_url) or not allowed_by_patterns(current_url, include, exclude):
+            continue
+        if robots is not None and not robots.can_fetch("*", current_url):
+            robots_skipped += 1
             continue
 
         try:
-            scraped = await scrape_url({"url": current_url, "formats": formats, "mode": mode})
-            page_links = [link for link in scraped.get("links", []) if same_site(link, root_url)]
+            if delay and pages:
+                await asyncio.sleep(delay)
+            scraped = await scrape_url(
+                {"url": current_url, "formats": formats, "mode": mode, "only_main_content": only_main_content}
+            )
+            page_links = [link for link in scraped.get("links", []) if in_scope(link, root_url)]
             page = {
                 "url": current_url,
                 "depth": depth,
@@ -464,7 +612,7 @@ async def crawl_url(payload: dict) -> dict:
             for link in page_links:
                 if link not in discovered:
                     discovered.append(link)
-                if depth < max_depth and link not in seen and len(seen) + len(queue) < max(limit * 4, limit):
+                if depth < max_depth and _dedupe_key(link, ignore_query) not in seen and len(seen) + len(queue) < max(limit * 4, limit):
                     queue.append((link, depth + 1))
         except Exception as exc:
             errors.append({"url": current_url, "depth": depth, "error": str(exc)})
@@ -486,4 +634,5 @@ async def crawl_url(payload: dict) -> dict:
         "pages": pages,
         "discovered": discovered[: max(limit * 3, 50)],
         "errors": errors,
+        "robots_skipped": robots_skipped,
     }

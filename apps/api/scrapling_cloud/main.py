@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from redis.exceptions import RedisError
@@ -14,6 +15,7 @@ from .billing import estimate_credits
 from .config import get_settings
 from .db import create_all, get_db
 from .intel import build_export_xlsx, parse_urls
+from .parse import parse_file
 from .jobs import create_job, requeue_stuck_jobs, webhook_secret_for
 from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, JobStatus, Organization, UsageEvent, User
 from .queue import get_redis
@@ -253,6 +255,32 @@ def batch(payload: BatchRequest, principal: Principal = Depends(require_api_key)
 
 
 INTEL_MAX_BYTES = 25 * 1024 * 1024
+
+
+@app.post("/v1/parse")
+async def parse_endpoint(
+    file: UploadFile = File(...),
+    principal: Principal = Depends(require_api_key),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Parse an uploaded document (PDF/DOCX/XLSX/HTML/TXT/CSV/MD) into markdown."""
+    data = await file.read()
+    if len(data) > INTEL_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds the 25MB limit.")
+    try:
+        parsed = await run_in_threadpool(parse_file, file.filename or "upload", data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"File could not be parsed: {exc}") from exc
+
+    from .billing import reserve_credits
+
+    credits = 1 + (parsed.get("pages") or 0) // 10
+    reserve_credits(db, principal.organization, credits, None, "parse_sync")
+    db.commit()
+    parsed["credits"] = credits
+    return parsed
 
 
 @app.post("/v1/intel/upload")

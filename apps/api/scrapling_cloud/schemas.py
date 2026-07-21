@@ -3,7 +3,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 
-Format = Literal["markdown", "html", "text", "links", "metadata", "screenshot", "json"]
+Format = Literal["markdown", "html", "raw_html", "text", "links", "images", "metadata", "screenshot", "json", "summary"]
 Mode = Literal["auto", "static", "dynamic", "stealth"]
 
 
@@ -15,6 +15,13 @@ class ScrapeRequest(BaseModel):
     mode: Mode = "auto"
     wait_for: str | None = None
     only_main_content: bool = True
+    include_tags: list[str] = Field(default_factory=list, max_length=30)
+    exclude_tags: list[str] = Field(default_factory=list, max_length=30)
+    headers: dict[str, str] | None = None
+    mobile: bool = False
+    timeout: int | None = Field(default=None, ge=5, le=300)
+    max_age: int = Field(default=0, ge=0, le=7 * 24 * 3600, description="Serve a cached result if newer than this many seconds (0 = always fetch fresh).")
+    store_in_cache: bool = True
     screenshot_full_page: bool = False
     proxy: bool = False
     extraction_schema: dict[str, Any] | None = Field(default=None, alias="schema")
@@ -29,6 +36,11 @@ class CrawlRequest(BaseModel):
     exclude: list[str] = Field(default_factory=list)
     formats: list[Format] = Field(default_factory=lambda: ["markdown", "links", "metadata"])
     mode: Mode = "auto"
+    only_main_content: bool = True
+    allow_subdomains: bool = False
+    ignore_query_parameters: bool = False
+    respect_robots: bool = True
+    delay: float = Field(default=0, ge=0, le=30)
     ai_extract: bool = True
     analysis_prompt: str | None = None
     webhook_url: HttpUrl | None = None
@@ -65,6 +77,7 @@ class BatchRequest(BaseModel):
     urls: list[HttpUrl] = Field(min_length=1, max_length=250)
     formats: list[Format] = Field(default_factory=lambda: ["markdown"])
     mode: Mode = "auto"
+    max_concurrency: int = Field(default=5, ge=1, le=10)
     webhook_url: HttpUrl | None = None
 
 

@@ -61,7 +61,7 @@ def test_main_content_strips_boilerplate_without_main() -> None:
 async def test_scrape_only_main_content_toggles_markdown(monkeypatch) -> None:
     html = "<html><body><nav>NAVBAR</nav><main><p>Hello world</p></main></body></html>"
 
-    async def fake_fetch(url, mode="static", wait_for=None, proxy=None):
+    async def fake_fetch(url, *args, **kwargs):
         return html
 
     monkeypatch.setattr(scraper, "fetch_html", fake_fetch)
