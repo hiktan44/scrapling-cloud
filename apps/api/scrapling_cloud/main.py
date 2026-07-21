@@ -610,9 +610,17 @@ def update_monitor(
 
 @app.delete("/v1/monitors/{monitor_id}")
 def delete_monitor(monitor_id: str, principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)) -> dict:
+    from sqlalchemy import delete as sa_delete
+
+    from .models import PageSnapshot
+
     monitor = get_org_monitor(db, principal, monitor_id)
-    for check in db.scalars(select(MonitorCheck).where(MonitorCheck.monitor_id == monitor.id)).all():
-        db.delete(check)
+    # Bulk-delete children first so the FK to monitors is clear before the
+    # parent row is removed. There is no ORM relationship declaring this
+    # dependency, so SQLAlchemy would otherwise emit the DELETEs in an order
+    # Postgres rejects (FK violation). Also drop the monitor's page snapshots.
+    db.execute(sa_delete(MonitorCheck).where(MonitorCheck.monitor_id == monitor.id))
+    db.execute(sa_delete(PageSnapshot).where(PageSnapshot.tag == f"monitor:{monitor.id}"))
     db.delete(monitor)
     db.commit()
     return {"deleted": monitor_id}

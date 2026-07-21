@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from scrapling_cloud.db import Base
@@ -10,6 +10,13 @@ from scrapling_cloud.monitors import _should_notify, check_cost, due_monitors, r
 @pytest.fixture()
 def db_session():
     engine = create_engine("sqlite:///:memory:")
+
+    # SQLite ignores foreign keys unless asked; enable them so tests catch the
+    # FK-ordering bugs that only Postgres would otherwise surface in production.
+    @event.listens_for(engine, "connect")
+    def _fk_on(dbapi_connection, _record):
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
     org = Organization(name="Mon Org", monthly_credits=100)
@@ -17,6 +24,25 @@ def db_session():
     session.commit()
     yield session, org
     session.close()
+
+
+def test_delete_monitor_with_checks_respects_fk(db_session) -> None:
+    from sqlalchemy import delete as sa_delete
+    from sqlalchemy import select
+
+    session, org = db_session
+    monitor = Monitor(organization_id=org.id, name="m", url="https://x.test", interval_minutes=5)
+    session.add(monitor)
+    session.commit()
+    session.add(MonitorCheck(monitor_id=monitor.id, organization_id=org.id, change_status="new"))
+    session.commit()
+
+    # Mirrors delete_monitor: children first, then parent.
+    session.execute(sa_delete(MonitorCheck).where(MonitorCheck.monitor_id == monitor.id))
+    session.delete(monitor)
+    session.commit()
+
+    assert session.scalar(select(Monitor).where(Monitor.id == monitor.id)) is None
 
 
 def make_monitor(session, org, **kwargs):
