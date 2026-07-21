@@ -33,10 +33,14 @@ services:
     restart: unless-stopped
     environment:
       SEARXNG_BASE_URL: http://searxng:8080/
-      # JSON output is disabled by default; enabled via settings.yml below.
-      SEARXNG_SECRET: ${SEARXNG_SECRET:-change-me-searxng}
-    volumes:
-      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    # settings.yml is injected as an inline compose config (not a host bind
+    # mount): Coolify's artifact dir made the relative bind path resolve to a
+    # non-existent source, so Docker created the mount target as a directory
+    # and SearXNG crash-looped. A config mounts real file content, so the
+    # entrypoint sees an existing settings.yml and skips template generation.
+    configs:
+      - source: searxng_settings
+        target: /etc/searxng/settings.yml
     expose:
       - "8080"
     healthcheck:
@@ -143,6 +147,20 @@ services:
         condition: service_healthy
     expose:
       - "3000"
+
+configs:
+  searxng_settings:
+    content: |
+      use_default_settings: true
+      server:
+        secret_key: "scrapling-cloud-searxng-internal-only"
+        limiter: false
+        image_proxy: false
+      search:
+        formats:
+          - html
+          - json
+        safe_search: 0
 
 volumes:
   postgres_data:
