@@ -373,7 +373,7 @@ ${t.codeStatus}
         <div className="apiCopy">
           <h2>{t.docsTitle}</h2>
           <p>{t.docsText}</p>
-          <a className="secondary" href={`${publicApiUrl}/docs`}>
+          <a className="secondary" href="/docs">
             {t.openDocs}
             <ArrowRight size={18} />
           </a>
@@ -445,7 +445,7 @@ function Header({ locale, setLocale, apiUrl }: { locale: Locale; setLocale: (loc
         <a href="#features">{t.nav[0]}</a>
         <a href="#api">{t.nav[1]}</a>
         <a href="#pricing">{t.nav[2]}</a>
-        <a href={`${apiUrl}/docs`}>{t.nav[3]}</a>
+        <a href="/docs">{t.nav[3]}</a>
       </nav>
       <div className="headerActions">
         <div className="languageSwitch" aria-label="Language selector">

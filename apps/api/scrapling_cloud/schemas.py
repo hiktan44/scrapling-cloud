@@ -249,3 +249,13 @@ class MonitorCheckResponse(BaseModel):
     error: str | None
     credits: int
     created_at: str
+
+
+class CheckoutRequest(BaseModel):
+    plan: Literal["growth", "scale"]
+    success_url: HttpUrl
+    cancel_url: HttpUrl
+
+
+class PortalRequest(BaseModel):
+    return_url: HttpUrl

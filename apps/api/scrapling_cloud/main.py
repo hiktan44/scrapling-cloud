@@ -39,8 +39,10 @@ from .schemas import (
     MapRequest,
     MonitorCheckResponse,
     MonitorCreate,
+    CheckoutRequest,
     MonitorResponse,
     MonitorUpdate,
+    PortalRequest,
     ScrapeRequest,
     SearchRequest,
     UsageSummary,
@@ -761,10 +763,62 @@ def domain_profiles(principal: Principal = Depends(require_api_key), db: Session
     ]
 
 
+@app.get("/v1/billing/plans")
+def billing_plans() -> dict:
+    from .plans import PLANS
+
+    return {
+        "plans": [
+            {
+                "key": p.key,
+                "name": p.name,
+                "monthly_credits": p.monthly_credits,
+                "concurrency_limit": p.concurrency_limit,
+                "monthly_price_usd": p.monthly_price_usd,
+            }
+            for p in PLANS.values()
+        ]
+    }
+
+
+@app.post("/v1/billing/checkout")
+def billing_checkout(payload: CheckoutRequest, principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)) -> dict:
+    from .billing_stripe import StripeNotConfigured, create_checkout_session
+
+    try:
+        url = create_checkout_session(db, principal.organization, payload.plan, str(payload.success_url), str(payload.cancel_url))
+    except StripeNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"checkout_url": url}
+
+
+@app.post("/v1/billing/portal")
+def billing_portal(payload: PortalRequest, principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)) -> dict:
+    from .billing_stripe import StripeNotConfigured, create_portal_session
+
+    try:
+        url = create_portal_session(principal.organization, str(payload.return_url))
+    except StripeNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"portal_url": url}
+
+
 @app.post("/v1/billing/stripe/webhook")
-async def stripe_webhook(request: Request) -> dict:
-    # Production hook: verify `stripe-signature` with STRIPE_WEBHOOK_SECRET and
-    # update plan/customer/subscription fields. This endpoint is kept deployable
-    # for Coolify and Stripe setup before live credentials are added.
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
+    from .billing_stripe import StripeNotConfigured, handle_event, verify_and_parse_event
+
     payload = await request.body()
-    return {"received": True, "bytes": len(payload)}
+    signature = request.headers.get("stripe-signature")
+    try:
+        event = verify_and_parse_event(payload, signature)
+    except StripeNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        # Signature mismatch or malformed body - reject so Stripe retries.
+        raise HTTPException(status_code=400, detail=f"Invalid webhook: {exc}") from exc
+    result = handle_event(db, event)
+    return {"received": True, "result": result}
