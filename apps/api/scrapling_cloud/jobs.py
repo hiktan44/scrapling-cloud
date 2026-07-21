@@ -134,28 +134,35 @@ def webhook_secret_for(organization_id: str) -> str:
 WEBHOOK_RETRY_DELAYS = (0, 2, 10, 30)
 
 
-async def send_webhook(job: Job) -> None:
-    if not job.webhook_url:
-        return
-    body = json.dumps(
-        {"id": job.id, "status": job.status, "kind": job.kind, "result": job.result, "error": job.error},
-        default=str,
-        separators=(",", ":"),
-    )
-    signature = hmac.new(webhook_secret_for(job.organization_id).encode(), body.encode(), hashlib.sha256).hexdigest()
+async def post_signed_webhook(url: str, payload: dict, organization_id: str, context: str) -> bool:
+    """POST a signed JSON payload with retries. Returns True when delivered."""
+    body = json.dumps(payload, default=str, separators=(",", ":"))
+    signature = hmac.new(webhook_secret_for(organization_id).encode(), body.encode(), hashlib.sha256).hexdigest()
     headers = {"Content-Type": "application/json", "X-Scrapling-Signature": f"sha256={signature}"}
     async with httpx.AsyncClient(timeout=10) as client:
         for attempt, delay in enumerate(WEBHOOK_RETRY_DELAYS, start=1):
             if delay:
                 await asyncio.sleep(delay)
             try:
-                response = await client.post(job.webhook_url, content=body, headers=headers)
+                response = await client.post(url, content=body, headers=headers)
                 if response.status_code < 300:
-                    return
-                logger.warning("webhook for job %s got HTTP %s (attempt %s)", job.id, response.status_code, attempt)
+                    return True
+                logger.warning("webhook for %s got HTTP %s (attempt %s)", context, response.status_code, attempt)
             except Exception as exc:
-                logger.warning("webhook for job %s failed (attempt %s): %s", job.id, attempt, exc)
-    logger.error("webhook for job %s exhausted %s attempts", job.id, len(WEBHOOK_RETRY_DELAYS))
+                logger.warning("webhook for %s failed (attempt %s): %s", context, attempt, exc)
+    logger.error("webhook for %s exhausted %s attempts", context, len(WEBHOOK_RETRY_DELAYS))
+    return False
+
+
+async def send_webhook(job: Job) -> None:
+    if not job.webhook_url:
+        return
+    await post_signed_webhook(
+        job.webhook_url,
+        {"id": job.id, "status": job.status, "kind": job.kind, "result": job.result, "error": job.error},
+        job.organization_id,
+        f"job {job.id}",
+    )
 
 
 def mark_running(db: Session, job: Job) -> None:

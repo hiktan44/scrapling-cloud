@@ -296,6 +296,24 @@ async def extract_with_schema(scrape_result: dict, schema: dict, prompt: str | N
         return {"enabled": False, "provider": "fallback_after_error", "reason": f"LLM extraction failed: {exc}", "data": basic, "schema": True}
 
 
+async def judge_change(goal: str, diff: str, url: str) -> dict:
+    """Decide whether a page change is meaningful for the user's stated goal."""
+    corpus = {"url": url, "goal": goal, "diff": str(diff)[:12000]}
+    system = (
+        "Sen bir değişiklik değerlendirme asistanısın. Bir web sayfasındaki değişikliğin (unified diff) "
+        "kullanıcının hedefi açısından anlamlı olup olmadığına karar ver. Reklam/rastgele sayı/tarih damgası "
+        "gibi gürültüleri anlamsız say. Sadece geçerli JSON döndür: "
+        '{"meaningful": true|false, "reason": "kısa Türkçe gerekçe"}'
+    )
+    try:
+        parsed = await _call_configured_provider(system, corpus)
+        if parsed is None:
+            return {"meaningful": None, "reason": "LLM key is not configured"}
+        return {"meaningful": bool(parsed.get("meaningful")), "reason": str(parsed.get("reason") or "")[:1000]}
+    except Exception as exc:
+        return {"meaningful": None, "reason": f"judge failed: {exc}"}
+
+
 async def extract_multi(pages: list[dict], schema: dict | None, prompt: str | None) -> dict:
     """LLM extraction over several scraped pages into a single data object."""
     corpus = {

@@ -186,3 +186,56 @@ class AdminCreditUpdate(BaseModel):
 class AdminApiKeyCreate(BaseModel):
     name: str = Field(default="Admin issued key", min_length=1, max_length=160)
     scopes: list[str] = Field(default_factory=lambda: ["scrape", "crawl", "map", "extract"])
+
+
+NotifyOn = Literal["changed", "meaningful", "always"]
+
+
+class MonitorCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    url: HttpUrl
+    mode: Literal["static", "dynamic", "stealth"] = "static"
+    interval_minutes: int = Field(default=60, ge=5, le=10080)
+    goal: str | None = Field(default=None, max_length=2000)
+    judge_enabled: bool = False
+    webhook_url: HttpUrl | None = None
+    notify_on: NotifyOn = "changed"
+    enabled: bool = True
+
+
+class MonitorUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    mode: Literal["static", "dynamic", "stealth"] | None = None
+    interval_minutes: int | None = Field(default=None, ge=5, le=10080)
+    goal: str | None = Field(default=None, max_length=2000)
+    judge_enabled: bool | None = None
+    webhook_url: HttpUrl | None = None
+    notify_on: NotifyOn | None = None
+    enabled: bool | None = None
+
+
+class MonitorResponse(BaseModel):
+    id: str
+    name: str
+    url: str
+    mode: str
+    interval_minutes: int
+    goal: str | None
+    judge_enabled: bool
+    webhook_url: str | None
+    notify_on: str
+    enabled: bool
+    last_checked_at: str | None
+    last_status: str | None
+    created_at: str
+
+
+class MonitorCheckResponse(BaseModel):
+    id: str
+    change_status: str
+    meaningful: bool | None
+    reason: str | None
+    diff: str | None
+    error: str | None
+    credits: int
+    created_at: str

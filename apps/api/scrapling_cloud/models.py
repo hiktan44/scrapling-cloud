@@ -133,6 +133,42 @@ class PageSnapshot(Base):
     scraped_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class Monitor(Base):
+    """Scheduled page monitor (Firecrawl /monitor parity, scrape target type)."""
+
+    __tablename__ = "monitors"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    url: Mapped[str] = mapped_column(String(2000), nullable=False)
+    mode: Mapped[str] = mapped_column(String(20), default="static")
+    interval_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    goal: Mapped[str | None] = mapped_column(Text)
+    judge_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    webhook_url: Mapped[str | None] = mapped_column(Text)
+    notify_on: Mapped[str] = mapped_column(String(20), default="changed")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_status: Mapped[str | None] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class MonitorCheck(Base):
+    __tablename__ = "monitor_checks"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    monitor_id: Mapped[str] = mapped_column(ForeignKey("monitors.id"), nullable=False, index=True)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    change_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    meaningful: Mapped[bool | None] = mapped_column(Boolean)
+    reason: Mapped[str | None] = mapped_column(Text)
+    diff: Mapped[str | None] = mapped_column(Text)
+    error: Mapped[str | None] = mapped_column(Text)
+    credits: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class DomainProfile(Base):
     __tablename__ = "domain_profiles"
     __table_args__ = (UniqueConstraint("organization_id", "domain", name="uq_domain_profile"),)

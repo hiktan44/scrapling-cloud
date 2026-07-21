@@ -236,10 +236,31 @@ def _requeue_sweep(stop: threading.Event, interval_seconds: int = 60) -> None:
         stop.wait(interval_seconds)
 
 
+def _monitor_sweep(stop: threading.Event, interval_seconds: int = 60) -> None:
+    """Run due page monitors on schedule."""
+    from .monitors import due_monitors, run_monitor_check
+
+    while not stop.is_set():
+        try:
+            db = SessionLocal()
+            try:
+                for monitor in due_monitors(db):
+                    try:
+                        asyncio.run(run_monitor_check(db, monitor))
+                    except Exception:
+                        logger.exception("monitor check failed for %s", monitor.id)
+            finally:
+                db.close()
+        except Exception:
+            logger.exception("monitor sweep failed")
+        stop.wait(interval_seconds)
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     stop = threading.Event()
     threading.Thread(target=_requeue_sweep, args=(stop,), daemon=True).start()
+    threading.Thread(target=_monitor_sweep, args=(stop,), daemon=True).start()
     while True:
         try:
             queue = get_queue()

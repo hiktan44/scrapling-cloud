@@ -17,7 +17,8 @@ from .db import create_all, get_db
 from .intel import build_export_xlsx, parse_urls
 from .parse import parse_file
 from .jobs import create_job, requeue_stuck_jobs, webhook_secret_for
-from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, JobStatus, Organization, UsageEvent, User
+from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, JobStatus, Monitor, MonitorCheck, Organization, UsageEvent, User
+from .monitors import run_monitor_check
 from .queue import get_redis
 from .ratelimit import client_ip, rate_limit
 from .schemas import (
@@ -36,6 +37,10 @@ from .schemas import (
     JobDetail,
     JobResponse,
     MapRequest,
+    MonitorCheckResponse,
+    MonitorCreate,
+    MonitorResponse,
+    MonitorUpdate,
     ScrapeRequest,
     UsageSummary,
 )
@@ -462,6 +467,120 @@ def usage(principal: Principal = Depends(require_api_key)) -> UsageSummary:
         concurrency_limit=org.concurrency_limit,
         is_admin="admin" in (principal.api_key.scopes or []),
     )
+
+
+MAX_MONITORS_PER_ORG = 20
+
+
+def monitor_response(monitor: Monitor) -> MonitorResponse:
+    return MonitorResponse(
+        id=monitor.id,
+        name=monitor.name,
+        url=monitor.url,
+        mode=monitor.mode,
+        interval_minutes=monitor.interval_minutes,
+        goal=monitor.goal,
+        judge_enabled=monitor.judge_enabled,
+        webhook_url=monitor.webhook_url,
+        notify_on=monitor.notify_on,
+        enabled=monitor.enabled,
+        last_checked_at=monitor.last_checked_at.isoformat() if monitor.last_checked_at else None,
+        last_status=monitor.last_status,
+        created_at=monitor.created_at.isoformat(),
+    )
+
+
+def check_response(check: MonitorCheck) -> MonitorCheckResponse:
+    return MonitorCheckResponse(
+        id=check.id,
+        change_status=check.change_status,
+        meaningful=check.meaningful,
+        reason=check.reason,
+        diff=check.diff,
+        error=check.error,
+        credits=check.credits,
+        created_at=check.created_at.isoformat(),
+    )
+
+
+def get_org_monitor(db: Session, principal: Principal, monitor_id: str) -> Monitor:
+    monitor = db.get(Monitor, monitor_id)
+    if monitor is None or monitor.organization_id != principal.organization.id:
+        raise HTTPException(status_code=404, detail="Monitor not found")
+    return monitor
+
+
+@app.post("/v1/monitors", response_model=MonitorResponse)
+def create_monitor(payload: MonitorCreate, principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)) -> MonitorResponse:
+    count = db.scalar(select(func.count()).select_from(Monitor).where(Monitor.organization_id == principal.organization.id))
+    if count is not None and count >= MAX_MONITORS_PER_ORG:
+        raise HTTPException(status_code=422, detail=f"Monitor limit reached ({MAX_MONITORS_PER_ORG}).")
+    monitor = Monitor(
+        organization_id=principal.organization.id,
+        name=payload.name,
+        url=str(payload.url),
+        mode=payload.mode,
+        interval_minutes=payload.interval_minutes,
+        goal=payload.goal,
+        judge_enabled=payload.judge_enabled,
+        webhook_url=str(payload.webhook_url) if payload.webhook_url else None,
+        notify_on=payload.notify_on,
+        enabled=payload.enabled,
+    )
+    db.add(monitor)
+    db.commit()
+    return monitor_response(monitor)
+
+
+@app.get("/v1/monitors", response_model=list[MonitorResponse])
+def list_monitors(principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)) -> list[MonitorResponse]:
+    monitors = db.scalars(
+        select(Monitor).where(Monitor.organization_id == principal.organization.id).order_by(desc(Monitor.created_at))
+    ).all()
+    return [monitor_response(monitor) for monitor in monitors]
+
+
+@app.get("/v1/monitors/{monitor_id}")
+def get_monitor(monitor_id: str, principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)) -> dict:
+    monitor = get_org_monitor(db, principal, monitor_id)
+    checks = db.scalars(
+        select(MonitorCheck).where(MonitorCheck.monitor_id == monitor.id).order_by(desc(MonitorCheck.created_at)).limit(20)
+    ).all()
+    return {"monitor": monitor_response(monitor).model_dump(), "checks": [check_response(check).model_dump() for check in checks]}
+
+
+@app.patch("/v1/monitors/{monitor_id}", response_model=MonitorResponse)
+def update_monitor(
+    monitor_id: str,
+    payload: MonitorUpdate,
+    principal: Principal = Depends(require_api_key),
+    db: Session = Depends(get_db),
+) -> MonitorResponse:
+    monitor = get_org_monitor(db, principal, monitor_id)
+    updates = payload.model_dump(exclude_unset=True)
+    if "webhook_url" in updates and updates["webhook_url"] is not None:
+        updates["webhook_url"] = str(updates["webhook_url"])
+    for field, value in updates.items():
+        setattr(monitor, field, value)
+    db.commit()
+    return monitor_response(monitor)
+
+
+@app.delete("/v1/monitors/{monitor_id}")
+def delete_monitor(monitor_id: str, principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)) -> dict:
+    monitor = get_org_monitor(db, principal, monitor_id)
+    for check in db.scalars(select(MonitorCheck).where(MonitorCheck.monitor_id == monitor.id)).all():
+        db.delete(check)
+    db.delete(monitor)
+    db.commit()
+    return {"deleted": monitor_id}
+
+
+@app.post("/v1/monitors/{monitor_id}/run", response_model=MonitorCheckResponse)
+async def run_monitor_now(monitor_id: str, principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)) -> MonitorCheckResponse:
+    monitor = get_org_monitor(db, principal, monitor_id)
+    check = await run_monitor_check(db, monitor)
+    return check_response(check)
 
 
 @app.get("/v1/webhook-secret")
