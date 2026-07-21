@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     kimi_model: str = "kimi-k2.5"
     proxy_provider_url: str | None = None
     proxy_provider_token: str | None = None
+    searxng_url: str | None = None
     # Secure-by-default: behave like production unless ENVIRONMENT says
     # otherwise. Development conveniences (seeded demo account, default
     # admin credentials) stay off until explicitly enabled.

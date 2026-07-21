@@ -28,6 +28,23 @@ services:
       timeout: 5s
       retries: 5
 
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      # JSON output is disabled by default; enabled via settings.yml below.
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-change-me-searxng}
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: ./apps/api
@@ -58,6 +75,7 @@ services:
       ZAI_MODEL: ${ZAI_MODEL:-glm-5.1}
       PROXY_PROVIDER_URL: ${PROXY_PROVIDER_URL:-}
       PROXY_PROVIDER_TOKEN: ${PROXY_PROVIDER_TOKEN:-}
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,6 +120,7 @@ services:
       ZAI_MODEL: ${ZAI_MODEL:-glm-5.1}
       PROXY_PROVIDER_URL: ${PROXY_PROVIDER_URL:-}
       PROXY_PROVIDER_TOKEN: ${PROXY_PROVIDER_TOKEN:-}
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
     depends_on:
       redis:
         condition: service_healthy

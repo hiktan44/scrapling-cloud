@@ -42,6 +42,7 @@ from .schemas import (
     MonitorResponse,
     MonitorUpdate,
     ScrapeRequest,
+    SearchRequest,
     UsageSummary,
 )
 from .scraper import map_url, scrape_url
@@ -241,6 +242,47 @@ async def map_endpoint(
     reserve_credits(db, principal.organization, credits, None, "map_sync")
     db.commit()
     return await map_url(payload.model_dump(mode="json", by_alias=True))
+
+
+@app.post("/v1/search")
+async def search_endpoint(
+    payload: SearchRequest,
+    principal: Principal = Depends(require_api_key),
+    db: Session = Depends(get_db),
+) -> dict:
+    from .search import SearchUnavailable, search_and_scrape
+
+    # 2 credits per 10 results, +1 per scraped result page.
+    scrape_formats = payload.scrape_formats or []
+    credits = max(2, 2 * ((payload.limit + 9) // 10)) + (payload.limit if scrape_formats else 0)
+    from .billing import reserve_credits
+
+    reserve_credits(db, principal.organization, credits, None, "search_sync")
+    db.commit()
+    try:
+        result = await search_and_scrape(
+            payload.query,
+            payload.limit,
+            scrape_formats or None,
+            payload.categories,
+            payload.language,
+            payload.time_range,
+            payload.mode,
+        )
+    except SearchUnavailable as exc:
+        from .jobs import refund_credits
+
+        refund_credits(db, principal.organization, credits, None, "search_unavailable_refund")
+        db.commit()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        from .jobs import refund_credits
+
+        refund_credits(db, principal.organization, credits, None, "search_failed_refund")
+        db.commit()
+        raise HTTPException(status_code=502, detail=f"Search failed: {exc}") from exc
+    result["credits"] = credits
+    return result
 
 
 @app.post("/v1/extract", response_model=JobResponse)

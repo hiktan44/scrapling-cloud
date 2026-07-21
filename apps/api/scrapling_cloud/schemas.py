@@ -56,6 +56,16 @@ class MapRequest(BaseModel):
     search: str | None = Field(default=None, max_length=200)
 
 
+class SearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    limit: int = Field(default=10, ge=1, le=30)
+    categories: str = Field(default="general", max_length=60)
+    language: str = Field(default="auto", max_length=10)
+    time_range: Literal["day", "week", "month", "year"] | None = None
+    scrape_formats: list[Format] | None = None
+    mode: Mode = "static"
+
+
 class ExtractRequest(BaseModel):
     """Firecrawl-style extraction: send a JSON schema and/or a natural-language prompt.
 
