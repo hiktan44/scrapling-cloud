@@ -1,12 +1,17 @@
+import asyncio
+import hashlib
+import hmac
+import json
 import logging
 from datetime import datetime, timedelta
 
 import httpx
 from fastapi import HTTPException, status
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from .billing import estimate_credits, reserve_credits
+from .config import get_settings
 from .learning import apply_profile_defaults
 from .models import Job, JobEvent, JobKind, JobStatus, Organization, UsageEvent
 from .queue import enqueue_job
@@ -14,7 +19,27 @@ from .queue import enqueue_job
 logger = logging.getLogger(__name__)
 
 
+def enforce_concurrency_limit(db: Session, organization: Organization) -> None:
+    active = db.scalar(
+        select(func.count())
+        .select_from(Job)
+        .where(
+            Job.organization_id == organization.id,
+            Job.status.in_([JobStatus.queued.value, JobStatus.running.value]),
+        )
+    )
+    if active is not None and active >= organization.concurrency_limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"Concurrency limit reached ({organization.concurrency_limit} active jobs). "
+                "Wait for running jobs to finish or upgrade your plan."
+            ),
+        )
+
+
 def create_job(db: Session, organization: Organization, kind: JobKind, payload: dict) -> Job:
+    enforce_concurrency_limit(db, organization)
     enriched = apply_profile_defaults(db, organization.id, payload)
     credits = estimate_credits(kind.value, enriched)
     job = Job(
@@ -96,14 +121,41 @@ def requeue_stuck_jobs(db: Session, older_than_seconds: int = 90, limit: int = 2
     return requeued
 
 
+def webhook_secret_for(organization_id: str) -> str:
+    """Deterministic per-organization webhook signing secret.
+
+    Derived from the server-side encryption key so it needs no schema change;
+    users fetch it once via GET /v1/webhook-secret to verify signatures.
+    """
+    settings = get_settings()
+    return hmac.new(settings.encryption_key.encode(), f"webhook:{organization_id}".encode(), hashlib.sha256).hexdigest()
+
+
+WEBHOOK_RETRY_DELAYS = (0, 2, 10, 30)
+
+
 async def send_webhook(job: Job) -> None:
     if not job.webhook_url:
         return
+    body = json.dumps(
+        {"id": job.id, "status": job.status, "kind": job.kind, "result": job.result, "error": job.error},
+        default=str,
+        separators=(",", ":"),
+    )
+    signature = hmac.new(webhook_secret_for(job.organization_id).encode(), body.encode(), hashlib.sha256).hexdigest()
+    headers = {"Content-Type": "application/json", "X-Scrapling-Signature": f"sha256={signature}"}
     async with httpx.AsyncClient(timeout=10) as client:
-        await client.post(
-            job.webhook_url,
-            json={"id": job.id, "status": job.status, "kind": job.kind, "result": job.result, "error": job.error},
-        )
+        for attempt, delay in enumerate(WEBHOOK_RETRY_DELAYS, start=1):
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                response = await client.post(job.webhook_url, content=body, headers=headers)
+                if response.status_code < 300:
+                    return
+                logger.warning("webhook for job %s got HTTP %s (attempt %s)", job.id, response.status_code, attempt)
+            except Exception as exc:
+                logger.warning("webhook for job %s failed (attempt %s): %s", job.id, attempt, exc)
+    logger.error("webhook for job %s exhausted %s attempts", job.id, len(WEBHOOK_RETRY_DELAYS))
 
 
 def mark_running(db: Session, job: Job) -> None:

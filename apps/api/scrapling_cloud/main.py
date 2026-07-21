@@ -14,7 +14,7 @@ from .billing import estimate_credits
 from .config import get_settings
 from .db import create_all, get_db
 from .intel import build_export_xlsx, parse_urls
-from .jobs import create_job, requeue_stuck_jobs
+from .jobs import create_job, requeue_stuck_jobs, webhook_secret_for
 from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, JobStatus, Organization, UsageEvent, User
 from .queue import get_redis
 from .ratelimit import client_ip, rate_limit
@@ -405,6 +405,16 @@ def usage(principal: Principal = Depends(require_api_key)) -> UsageSummary:
         concurrency_limit=org.concurrency_limit,
         is_admin="admin" in (principal.api_key.scopes or []),
     )
+
+
+@app.get("/v1/webhook-secret")
+def webhook_secret(principal: Principal = Depends(require_api_key)) -> dict:
+    """Return the signing secret used for X-Scrapling-Signature webhook headers."""
+    return {
+        "secret": webhook_secret_for(principal.organization.id),
+        "header": "X-Scrapling-Signature",
+        "algorithm": "hmac-sha256",
+    }
 
 
 def admin_org_response(db: Session, org: Organization) -> AdminOrganizationResponse:

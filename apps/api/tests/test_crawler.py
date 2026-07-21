@@ -10,7 +10,7 @@ async def test_crawl_follows_same_site_links(monkeypatch) -> None:
         "https://example.com/next": "<html><head><title>Next</title></head><body>Deep text</body></html>",
     }
 
-    async def fake_fetch(url: str, mode: str = "static", wait_for: str | None = None) -> str:
+    async def fake_fetch(url: str, mode: str = "static", wait_for: str | None = None, proxy: str | None = None) -> str:
         return pages[url]
 
     monkeypatch.setattr(scraper, "fetch_html", fake_fetch)

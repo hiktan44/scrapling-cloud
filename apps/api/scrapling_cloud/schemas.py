@@ -15,6 +15,8 @@ class ScrapeRequest(BaseModel):
     mode: Mode = "auto"
     wait_for: str | None = None
     only_main_content: bool = True
+    screenshot_full_page: bool = False
+    proxy: bool = False
     extraction_schema: dict[str, Any] | None = Field(default=None, alias="schema")
     webhook_url: HttpUrl | None = None
 
@@ -36,6 +38,8 @@ class MapRequest(BaseModel):
     url: HttpUrl
     limit: int = Field(default=250, ge=1, le=5000)
     include_subdomains: bool = False
+    sitemap: Literal["include", "skip", "only"] = "include"
+    search: str | None = Field(default=None, max_length=200)
 
 
 class ExtractRequest(BaseModel):
