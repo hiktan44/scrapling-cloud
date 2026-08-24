@@ -3,6 +3,7 @@
 import { ArrowLeft, Terminal } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useT } from "../../lib/i18n";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -154,6 +155,7 @@ const methodColor: Record<string, string> = {
 };
 
 export default function DocsPage() {
+  const t = useT();
   const [active, setActive] = useState("auth");
   const curl = useMemo(
     () =>
@@ -164,11 +166,11 @@ export default function DocsPage() {
   return (
     <main style={{ maxWidth: 1080, margin: "0 auto", padding: "32px 24px 80px" }}>
       <Link href="/" style={{ display: "inline-flex", gap: 8, alignItems: "center", color: "var(--muted)", textDecoration: "none", fontSize: 14 }}>
-        <ArrowLeft size={16} /> Ana sayfa
+        <ArrowLeft size={16} /> {t("common.back")} {t("home.footerProduct")}
       </Link>
 
       <header style={{ marginTop: 24, marginBottom: 32 }}>
-        <h1 style={{ fontSize: 40, margin: "0 0 8px", letterSpacing: -1 }}>API Dokümantasyonu</h1>
+        <h1 style={{ fontSize: 40, margin: "0 0 8px", letterSpacing: -1 }}>API {t("nav.docs")}</h1>
         <p style={{ color: "var(--muted)", fontSize: 17, maxWidth: 720 }}>
           Scrapling Cloud, temiz web verisi gereken ürünler için scrape / crawl / map / extract / search / monitor API'sidir.
           Taban URL: <code style={{ background: "var(--soft)", padding: "2px 6px", borderRadius: 6 }}>{apiUrl}</code>

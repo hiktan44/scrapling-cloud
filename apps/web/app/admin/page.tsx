@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useT } from "../../lib/i18n";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -42,6 +43,7 @@ type ApiKey = {
 };
 
 export default function AdminPage() {
+  const t = useT();
   const [apiKey, setApiKey] = useState("");
   const [organizations, setOrganizations] = useState<AdminOrganization[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -85,7 +87,7 @@ export default function AdminPage() {
     const response = await fetch(`${apiUrl}${path}`, { ...init, headers: { ...headers, ...init?.headers } });
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.detail ?? "Admin isteği başarısız oldu");
+      throw new Error(data.detail ?? t("admin.adminRequestFailed"));
     }
     return data;
   }
@@ -100,7 +102,7 @@ export default function AdminPage() {
         setSelectedId(data[0].id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Admin panel yüklenemedi");
+      setError(err instanceof Error ? err.message : t("admin.adminLoadError"));
     } finally {
       setLoading(false);
     }
@@ -124,9 +126,9 @@ export default function AdminPage() {
         })
       });
       setOrganizations((items) => items.map((item) => (item.id === updated.id ? updated : item)));
-      setMessage(operation === "add" ? "Kredi yüklendi" : operation === "set_monthly" ? "Aylık kredi limiti güncellendi" : "Kullanım sıfırlandı");
+      setMessage(operation === "add" ? t("admin.creditsLoaded") : operation === "set_monthly" ? t("admin.monthlyLimitUpdated") : t("admin.usageReset"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kredi güncellenemedi");
+      setError(err instanceof Error ? err.message : t("admin.creditsUpdateError"));
     } finally {
       setWorking(false);
     }
@@ -146,9 +148,9 @@ export default function AdminPage() {
         body: JSON.stringify({ name: keyName, scopes: ["scrape", "crawl", "map", "extract"] })
       });
       setNewKey(key.key ?? "");
-      setMessage(`${selected.name} için API key oluşturuldu`);
+      setMessage(`${selected.name} ${t("admin.forWorkspace")} ${t("admin.apiKeyCreated")}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "API key oluşturulamadı");
+      setError(err instanceof Error ? err.message : t("admin.apiKeyCreateError"));
     } finally {
       setWorking(false);
     }
@@ -159,53 +161,53 @@ export default function AdminPage() {
       <aside className="dashboardSidebar">
         <Link className="logo" href="/dashboard"><span>SC</span> Scrapling Cloud</Link>
         <nav>
-          <Link href="/dashboard"><Home size={18} /> Dashboard</Link>
-          <a href="#organizations"><ShieldCheck size={18} /> Organizasyonlar</a>
-          <a href="#credits"><WalletCards size={18} /> Kredi yönetimi</a>
-          <a href="#keys"><KeyRound size={18} /> Kullanıcı key</a>
-          <Link href="/data"><DatabaseZap size={18} /> Data Explorer</Link>
-          <a href={`${apiUrl}/docs`} target="_blank"><BookOpenText size={18} /> Docs</a>
+          <Link href="/dashboard"><Home size={18} /> {t("dashboard.dashboard")}</Link>
+          <a href="#organizations"><ShieldCheck size={18} /> {t("admin.organizations")}</a>
+          <a href="#credits"><WalletCards size={18} /> {t("admin.creditManagement")}</a>
+          <a href="#keys"><KeyRound size={18} /> {t("admin.userKeys")}</a>
+          <Link href="/data"><DatabaseZap size={18} /> {t("dashboard.dataExplorer")}</Link>
+          <a href={`${apiUrl}/docs`} target="_blank"><BookOpenText size={18} /> {t("dashboard.docs")}</a>
         </nav>
       </aside>
 
       <section className="dashboardMain">
         <header className="dashboardTop">
           <div>
-            <span>Admin</span>
-            <h1>Kullanıcı ve kredi yönetimi</h1>
+            <span>{t("admin.admin")}</span>
+            <h1>{t("admin.userAndCreditManagement")}</h1>
           </div>
           <div className="dashboardActions">
             <button className="secondary" onClick={refresh} disabled={loading}>
               <RefreshCw size={18} />
-              Yenile
+              {t("common.refresh")}
             </button>
           </div>
         </header>
 
         {error && <div className="formError dashboardError">{error}</div>}
         {message && <div className="successNotice">{message}</div>}
-        {loading && <div className="loadingLine"><Loader2 className="spin" size={18} /> Admin verileri yükleniyor</div>}
+        {loading && <div className="loadingLine"><Loader2 className="spin" size={18} /> {t("admin.adminDataLoading")}</div>}
 
         <section className="dashboardGrid">
-          <Metric title="Workspace" value={String(organizations.length)} />
-          <Metric title="Toplam kredi" value={organizations.reduce((sum, org) => sum + org.monthly_credits, 0).toLocaleString("tr-TR")} />
-          <Metric title="Kullanılan" value={organizations.reduce((sum, org) => sum + org.used_credits, 0).toLocaleString("tr-TR")} />
-          <Metric title="Seçili kalan" value={selected ? selected.remaining_credits.toLocaleString("tr-TR") : "-"} />
+          <Metric title={t("admin.workspace")} value={String(organizations.length)} />
+          <Metric title={t("admin.totalCredits")} value={organizations.reduce((sum, org) => sum + org.monthly_credits, 0).toLocaleString("tr-TR")} />
+          <Metric title={t("admin.used")} value={organizations.reduce((sum, org) => sum + org.used_credits, 0).toLocaleString("tr-TR")} />
+          <Metric title={t("admin.selectedRemaining")} value={selected ? selected.remaining_credits.toLocaleString("tr-TR") : "-"} />
         </section>
 
         <section className="dashboardPanel" id="organizations">
           <div className="panelHeader">
             <div>
-              <h2>Tüm kullanıcılar</h2>
-              <p>Workspace seç, kredi ve API key işlemlerini o kullanıcı/organizasyon için uygula.</p>
+              <h2>{t("admin.allUsers")}</h2>
+              <p>{t("admin.allUsersDesc")}</p>
             </div>
           </div>
           <div className="adminOrgGrid">
             {organizations.map((org) => (
               <button className={selectedId === org.id ? "selected" : ""} key={org.id} onClick={() => setSelectedId(org.id)}>
-                <span>{org.owner_email ?? "E-posta yok"}</span>
+                <span>{org.owner_email ?? t("admin.noEmail")}</span>
                 <strong>{org.name}</strong>
-                <small>{org.plan} · {org.remaining_credits.toLocaleString("tr-TR")} kalan kredi</small>
+                <small>{org.plan} · {org.remaining_credits.toLocaleString("tr-TR")} {t("admin.remainingCredits")}</small>
               </button>
             ))}
           </div>
@@ -213,62 +215,62 @@ export default function AdminPage() {
 
         <section className="dashboardPanel adminControlGrid" id="credits">
           <div>
-            <h2>Kredi yükle</h2>
-            <p>{selected ? `${selected.name} için kredi, plan ve concurrency ayarları.` : "Önce bir workspace seç."}</p>
+            <h2>{t("admin.addCredits")}</h2>
+            <p>{selected ? `${selected.name} ${t("admin.forWorkspace")} ${t("admin.addCreditsDesc")}` : t("admin.selectWorkspace")}</p>
           </div>
           <div className="adminFormGrid">
             <label>
-              Kredi
+              {t("admin.credits")}
               <input type="number" min={0} value={credits} onChange={(event) => setCredits(Number(event.target.value))} />
             </label>
             <label>
-              Plan
+              {t("admin.plan")}
               <input value={plan} onChange={(event) => setPlan(event.target.value)} />
             </label>
             <label>
-              Concurrency
+              {t("admin.concurrency")}
               <input type="number" min={1} max={1000} value={concurrency} onChange={(event) => setConcurrency(Number(event.target.value))} />
             </label>
           </div>
           <div className="adminButtonRow">
             <button className="primary" onClick={() => updateCredits("add")} disabled={working || !selected}>
               <CreditCard size={18} />
-              Kredi ekle
+              {t("admin.addCredit")}
             </button>
             <button className="secondary" onClick={() => updateCredits("set_monthly")} disabled={working || !selected}>
-              Aylık limiti yap
+              {t("admin.setMonthlyLimit")}
             </button>
             <button className="secondary" onClick={() => updateCredits("reset_usage")} disabled={working || !selected}>
-              Kullanımı sıfırla
+              {t("admin.resetUsage")}
             </button>
           </div>
         </section>
 
         <section className="dashboardPanel adminControlGrid" id="keys">
           <div>
-            <h2>Kullanıcı için API key üret</h2>
-            <p>Bu key sadece bir kez gösterilir; müşteriye veya kendi uygulamana Bearer token olarak ver.</p>
+            <h2>{t("admin.generateApiKey")}</h2>
+            <p>{t("admin.generateApiKeyDesc")}</p>
           </div>
           <div className="adminFormGrid single">
             <label>
-              Key adı
+              {t("admin.keyName")}
               <input value={keyName} onChange={(event) => setKeyName(event.target.value)} />
             </label>
           </div>
           <div className="adminButtonRow">
             <button className="primary" onClick={createCustomerKey} disabled={working || !selected}>
               <KeyRound size={18} />
-              API key oluştur
+              {t("admin.createApiKey")}
               <ArrowRight size={18} />
             </button>
           </div>
           {newKey && (
             <div className="newKeyBox">
-              <strong>Yeni kullanıcı API key’i</strong>
+              <strong>{t("admin.newUserApiKey")}</strong>
               <code>{newKey}</code>
               <button onClick={() => navigator.clipboard.writeText(newKey)}>
                 <Copy size={16} />
-                Kopyala
+                {t("common.copy")}
               </button>
             </div>
           )}

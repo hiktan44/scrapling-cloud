@@ -4,10 +4,8 @@ import {
   ArrowRight,
   BookOpenText,
   Bot,
-  Braces,
   Check,
   Code2,
-  DatabaseZap,
   FileJson2,
   Gauge,
   Globe2,
@@ -15,94 +13,16 @@ import {
   LineChart,
   LockKeyhole,
   Map,
-  Play,
   Radar,
   ShieldCheck,
   Sparkles,
   Star,
-  Webhook,
-  Zap
+  Webhook
 } from "lucide-react";
 import { useEffect, useState } from "react";
-
-type Locale = "en" | "tr";
-
-const copy = {
-  en: {
-    nav: ["Features", "API", "Pricing", "Docs"],
-    signIn: "Sign in",
-    getKey: "Get API key",
-    heroTitle: "Scraping infrastructure for products that need clean web data",
-    heroText:
-      "Scrapling Cloud turns Scrapling into a Firecrawl-style SaaS: scrape, crawl, map and extract with API keys, credits, webhooks, docs and safe domain learning.",
-    primaryCta: "Start building",
-    docsCta: "View API docs",
-    trust: ["Self-host on Coolify", "Stripe credits", "Scrapling powered"],
-    featureTitle: "Every core scraping workflow, boxed and ready",
-    featureText: "Colorful product modules keep the platform easy to understand while the API stays developer-first.",
-    workflowTitle: "From URL to clean data in three steps",
-    workflowText: "Use the dashboard for humans and the REST API for your applications.",
-    analyticsTitle: "Usage, credits and learning signals in one place",
-    analyticsText:
-      "Track consumption, job status, concurrency, webhook delivery and recommendations without digging through worker logs.",
-    analyticsBullets: [
-      "Plan-based concurrency and monthly credits",
-      "Async job callbacks for your apps",
-      "Domain policies and respectful throttling"
-    ],
-    docsTitle: "Developer docs built into the product",
-    docsText: "Publish OpenAPI, curl snippets and SDK examples next to the dashboard so your customers can start quickly.",
-    openDocs: "Open FastAPI docs",
-    testimonialsTitle: "Built for teams shipping data products",
-    testimonialsText: "Clear APIs for developers, visible usage for operators, simple controls for customers.",
-    pricingTitle: "Plans that map cleanly to API usage",
-    pricingText: "Stripe subscriptions, monthly credits and plan-based limits are ready for Coolify deployment.",
-    choosePlan: "Choose plan",
-    footerText: "Self-hosted scraping API infrastructure powered by Scrapling.",
-    footerProduct: "Product",
-    footerDevelopers: "Developers",
-    footerCompany: "Company",
-    metrics: ["Credits remaining", "Active jobs", "Weekly usage", "8 concurrent workers", "monthly credits"],
-    codeStatus: "→ 200 queued"
-  },
-  tr: {
-    nav: ["Özellikler", "API", "Fiyatlandırma", "Dokümanlar"],
-    signIn: "Giriş yap",
-    getKey: "API key al",
-    heroTitle: "Temiz web verisine ihtiyaç duyan ürünler için scraping altyapısı",
-    heroText:
-      "Scrapling Cloud, Scrapling’i Firecrawl benzeri bir SaaS platformuna dönüştürür: API key, kredi, webhook, doküman ve güvenli domain öğrenmesiyle scrape, crawl, map ve extract.",
-    primaryCta: "Kullanmaya başla",
-    docsCta: "API dokümanları",
-    trust: ["Coolify üzerinde self-host", "Stripe kredi sistemi", "Scrapling destekli"],
-    featureTitle: "Tüm temel scraping iş akışları kutu kutu hazır",
-    featureText: "Canlı renkli ürün modülleri platformu anlaşılır tutar; API ise geliştirici dostu kalır.",
-    workflowTitle: "URL’den temiz veriye üç adımda",
-    workflowText: "İnsanlar için dashboard, uygulamalarınız için REST API.",
-    analyticsTitle: "Kullanım, kredi ve öğrenme sinyalleri tek yerde",
-    analyticsText:
-      "Worker loglarında kaybolmadan tüketimi, iş durumlarını, concurrency’yi, webhook teslimatını ve önerileri takip edin.",
-    analyticsBullets: [
-      "Plan bazlı concurrency ve aylık krediler",
-      "Uygulamalarınız için async job callback’leri",
-      "Domain politikaları ve saygılı hız sınırlama"
-    ],
-    docsTitle: "Ürünün içinde geliştirici dokümanları",
-    docsText: "Müşterileriniz hızlı başlasın diye OpenAPI, curl örnekleri ve SDK kullanımlarını dashboard yanında yayınlayın.",
-    openDocs: "FastAPI dokümanını aç",
-    testimonialsTitle: "Veri ürünü geliştiren ekipler için tasarlandı",
-    testimonialsText: "Geliştiriciler için net API’ler, operasyon için görünür kullanım, müşteriler için basit kontroller.",
-    pricingTitle: "API kullanımına net oturan paketler",
-    pricingText: "Stripe abonelikleri, aylık krediler ve plan bazlı limitler Coolify dağıtımı için hazır.",
-    choosePlan: "Paketi seç",
-    footerText: "Scrapling destekli self-hosted scraping API altyapısı.",
-    footerProduct: "Ürün",
-    footerDevelopers: "Geliştiriciler",
-    footerCompany: "Şirket",
-    metrics: ["Kalan kredi", "Aktif işler", "Haftalık kullanım", "8 eşzamanlı worker", "aylık kredi"],
-    codeStatus: "→ 200 kuyruğa alındı"
-  }
-} as const;
+import { useT } from "../lib/i18n";
+import { pickByLang } from "../lib/use-lang";
+import LangSwitch from "../components/LangSwitch";
 
 const features = {
   en: [
@@ -234,8 +154,8 @@ const pricing = {
 } as const;
 
 export default function Home() {
-  const [locale, setLocale] = useState<Locale>("tr");
-  const t = copy[locale];
+  const t = useT();
+  const [lang, setLang] = useState<"tr" | "en">("tr");
   const publicApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
   const [successRate, setSuccessRate] = useState<number | null>(null);
 
@@ -256,25 +176,27 @@ export default function Home() {
 
   return (
     <main>
-      <Header locale={locale} setLocale={setLocale} apiUrl={publicApiUrl} />
+      <Header apiUrl={publicApiUrl} />
       <section className="hero">
         <div className="heroCopy">
-          <h1>{t.heroTitle}</h1>
+          <h1>{t("home.heroTitle")}</h1>
           <p>
-            {t.heroText}
+            {t("home.heroText")}
           </p>
           <div className="heroActions">
             <a className="primary" href="#pricing">
-              {t.primaryCta}
+              {t("home.primaryCta")}
               <ArrowRight size={18} />
             </a>
             <a className="secondary" href="#api">
-              {t.docsCta}
+              {t("home.docsCta")}
               <BookOpenText size={18} />
             </a>
           </div>
           <div className="trustRow">
-            {t.trust.map((item) => <span key={item}><Check size={16} /> {item}</span>)}
+            <span><Check size={16} /> {t("home.trust")}</span>
+            <span><Check size={16} /> {t("home.trust2")}</span>
+            <span><Check size={16} /> {t("home.trust3")}</span>
           </div>
         </div>
         <div className="heroVisual" aria-label="API response and usage preview">
@@ -291,7 +213,7 @@ export default function Home() {
   "mode": "auto"
 }
 
-${t.codeStatus}
+→ 200 ${t("home.queued")}
 {
   "id": "job_7H9K",
   "status": "running",
@@ -300,7 +222,7 @@ ${t.codeStatus}
           </div>
           <div className="chartCard floating">
             <div>
-              <span>{locale === "tr" ? "Başarı oranı (canlı)" : "Success rate (live)"}</span>
+              <span>{t("home.successRateLive")}</span>
               <strong>{successRate !== null ? `${successRate}%` : "—"}</strong>
             </div>
             <MiniChart />
@@ -310,11 +232,11 @@ ${t.codeStatus}
 
       <section className="featureBand" id="features">
         <div className="sectionHeading">
-          <h2>{t.featureTitle}</h2>
-          <p>{t.featureText}</p>
+          <h2>{t("home.featureTitle")}</h2>
+          <p>{t("home.featureText")}</p>
         </div>
         <div className="featureGrid">
-          {features[locale].map((feature) => (
+          {features[lang].map((feature) => (
             <article className={`featureCard ${feature.tone}`} key={feature.title}>
               <div className="featureIcon"><feature.icon size={24} /></div>
               <h3>{feature.title}</h3>
@@ -326,42 +248,40 @@ ${t.codeStatus}
 
       <section className="workflow">
         <div className="sectionHeading">
-          <h2>{t.workflowTitle}</h2>
-          <p>{t.workflowText}</p>
+          <h2>{t("home.workflowTitle")}</h2>
+          <p>{t("home.workflowText")}</p>
         </div>
         <div className="steps">
-          <Step number="01" title={locale === "tr" ? "Key oluştur" : "Create a key"} text={locale === "tr" ? "Production, staging veya müşteriye özel entegrasyonlar için scoped API key üretin." : "Generate scoped API keys for production, staging or customer-specific integrations."} icon={LockKeyhole} />
-          <Step number="02" title={locale === "tr" ? "Job gönder" : "Send a job"} text={locale === "tr" ? "Scrape, crawl, map, extract veya batch endpoint’lerini tahmin edilebilir JSON payload’larıyla çağırın." : "Call scrape, crawl, map, extract or batch endpoints with predictable JSON payloads."} icon={Code2} />
-          <Step number="03" title={locale === "tr" ? "Güvenle öğren" : "Learn safely"} text={locale === "tr" ? "Başarılı selector ve render stratejileri domain bazında sonraki çalışmaları iyileştirir." : "Successful selectors and render strategies improve future runs by domain."} icon={Bot} />
+          <Step number="01" title={t("home.step1Title")} text={t("home.step1Text")} icon={LockKeyhole} />
+          <Step number="02" title={t("home.step2Title")} text={t("home.step2Text")} icon={Code2} />
+          <Step number="03" title={t("home.step3Title")} text={t("home.step3Text")} icon={Bot} />
         </div>
       </section>
 
       <section className="analytics">
         <div className="analyticsCopy">
-          <h2>{t.analyticsTitle}</h2>
-          <p>{t.analyticsText}</p>
+          <h2>{t("home.analyticsTitle")}</h2>
+          <p>{t("home.analyticsText")}</p>
           <ul>
-            {t.analyticsBullets.map((item, index) => {
-              const icons = [Gauge, Webhook, ShieldCheck];
-              const Icon = icons[index];
-              return <li key={item}><Icon size={18} /> {item}</li>;
-            })}
+            <li><Gauge size={18} /> {t("home.analyticsBullet1")}</li>
+            <li><Webhook size={18} /> {t("home.analyticsBullet2")}</li>
+            <li><ShieldCheck size={18} /> {t("home.analyticsBullet3")}</li>
           </ul>
         </div>
         <div className="analyticsBoard">
           <div className="metricCard tealMetric">
-            <span>{t.metrics[0]}</span>
+            <span>{t("dashboard.remainingCredits")}</span>
             <strong>49,982</strong>
             <div className="meter"><i /></div>
           </div>
           <div className="metricCard">
-            <span>{t.metrics[1]}</span>
+            <span>{t("dashboard.active")}</span>
             <strong>12</strong>
-            <p>{t.metrics[3]}</p>
+            <p>8 concurrent workers</p>
           </div>
           <div className="graphPanel">
             <div className="graphHeader">
-              <span>{t.metrics[2]}</span>
+              <span>{t("dashboard.weeklyUsage")}</span>
               <LineChart size={18} />
             </div>
             <MiniChart large />
@@ -371,10 +291,10 @@ ${t.codeStatus}
 
       <section className="apiSection" id="api">
         <div className="apiCopy">
-          <h2>{t.docsTitle}</h2>
-          <p>{t.docsText}</p>
+          <h2>{t("home.docsTitle")}</h2>
+          <p>{t("home.docsText")}</p>
           <a className="secondary" href="/docs">
-            {t.openDocs}
+            {t("home.openDocs")}
             <ArrowRight size={18} />
           </a>
         </div>
@@ -387,22 +307,22 @@ ${t.codeStatus}
           <pre>{`curl -X POST ${publicApiUrl}/v1/scrape \\
   -H "Authorization: Bearer sk_..." \\
   -H "Content-Type: application/json" \\
-  -d '{"url":"https://example.com","formats":["markdown","links"]}'`}</pre>
+  -d ‘{"url":"https://example.com","formats":["markdown","links"]}’`}</pre>
         </div>
       </section>
 
       <section className="testimonials" id="customers">
         <div className="sectionHeading">
-          <h2>{t.testimonialsTitle}</h2>
-          <p>{t.testimonialsText}</p>
+          <h2>{t("home.testimonialsTitle")}</h2>
+          <p>{t("home.testimonialsText")}</p>
         </div>
         <div className="testimonialGrid">
-          {testimonials[locale].map((item) => (
+          {testimonials[lang].map((item) => (
             <article className="testimonial" key={item.name}>
               <div className="stars">
                 {Array.from({ length: 5 }).map((_, index) => <Star size={16} fill="currentColor" key={index} />)}
               </div>
-              <p>“{item.quote}”</p>
+              <p>"{item.quote}"</p>
               <strong>{item.name}</strong>
               <span>{item.role}</span>
             </article>
@@ -412,29 +332,29 @@ ${t.codeStatus}
 
       <section className="pricing" id="pricing">
         <div className="sectionHeading">
-          <h2>{t.pricingTitle}</h2>
-          <p>{t.pricingText}</p>
+          <h2>{t("home.pricingTitle")}</h2>
+          <p>{t("home.pricingText")}</p>
         </div>
         <div className="pricingGrid">
-          {pricing[locale].map(([name, credits, text], index) => (
+          {pricing[lang].map(([name, credits, text], index) => (
             <article className={index === 1 ? "priceCard featured" : "priceCard"} key={name}>
               <h3>{name}</h3>
               <strong>{credits}</strong>
-              <span>{t.metrics[4]}</span>
+              <span>{t("home.monthlyCredits")}</span>
               <p>{text}</p>
-              <a href="#api">{t.choosePlan}</a>
+              <a href="#api">{t("common.choose")}</a>
             </article>
           ))}
         </div>
       </section>
 
-      <Footer locale={locale} apiUrl={publicApiUrl} />
+      <Footer apiUrl={publicApiUrl} />
     </main>
   );
 }
 
-function Header({ locale, setLocale, apiUrl }: { locale: Locale; setLocale: (locale: Locale) => void; apiUrl: string }) {
-  const t = copy[locale];
+function Header({ apiUrl }: { apiUrl: string }) {
+  const t = useT();
   return (
     <header className="siteHeader">
       <a className="logo" href="#">
@@ -442,24 +362,21 @@ function Header({ locale, setLocale, apiUrl }: { locale: Locale; setLocale: (loc
         Scrapling Cloud
       </a>
       <nav className="navLinks">
-        <a href="#features">{t.nav[0]}</a>
-        <a href="#api">{t.nav[1]}</a>
-        <a href="#pricing">{t.nav[2]}</a>
-        <a href="/docs">{t.nav[3]}</a>
+        <a href="#features">{t("nav.features")}</a>
+        <a href="#api">{t("nav.api")}</a>
+        <a href="#pricing">{t("nav.pricing")}</a>
+        <a href="/docs">{t("nav.docs")}</a>
       </nav>
       <div className="headerActions">
-        <div className="languageSwitch" aria-label="Language selector">
-          <button className={locale === "tr" ? "selected" : ""} onClick={() => setLocale("tr")}>TR</button>
-          <button className={locale === "en" ? "selected" : ""} onClick={() => setLocale("en")}>EN</button>
-        </div>
-        <a className="signIn" href="/login">{t.signIn}</a>
-        <a className="headerCta" href="/login">{t.getKey}</a>
+        <LangSwitch />
+        <a className="signIn" href="/login">{t("common.signIn")}</a>
+        <a className="headerCta" href="/login">{t("common.apiKey")}</a>
       </div>
     </header>
   );
 }
 
-function Step({ number, title, text, icon: Icon }: { number: string; title: string; text: string; icon: typeof Zap }) {
+function Step({ number, title, text, icon: Icon }: { number: string; title: string; text: string; icon: typeof Bot }) {
   return (
     <article className="step">
       <span>{number}</span>
@@ -481,30 +398,31 @@ function MiniChart({ large = false }: { large?: boolean }) {
   );
 }
 
-function Footer({ locale, apiUrl }: { locale: Locale; apiUrl: string }) {
-  const t = copy[locale];
+function Footer({ apiUrl }: { apiUrl: string }) {
+  const t = useT();
+  const [lang] = useState<"tr" | "en">("tr");
   return (
     <footer className="footer">
       <div>
         <a className="logo" href="#"><span>SC</span> Scrapling Cloud</a>
-        <p>{t.footerText}</p>
+        <p>{t("home.footerText")}</p>
       </div>
       <div>
-        <strong>{t.footerProduct}</strong>
-        <a href="#features">{t.nav[0]}</a>
-        <a href="#pricing">{t.nav[2]}</a>
-        <a href="#customers">{locale === "tr" ? "Müşteriler" : "Customers"}</a>
+        <strong>{t("home.footerProduct")}</strong>
+        <a href="#features">{t("nav.features")}</a>
+        <a href="#pricing">{t("nav.pricing")}</a>
+        <a href="#customers">{t("nav.customers")}</a>
       </div>
       <div>
-        <strong>{t.footerDevelopers}</strong>
-        <a href="#api">{locale === "tr" ? "API dokümanları" : "API docs"}</a>
+        <strong>{t("home.footerDevelopers")}</strong>
+        <a href="#api">{t("nav.apiDocs")}</a>
         <a href={`${apiUrl}/docs`}>OpenAPI</a>
         <a href="#features">SDKs</a>
       </div>
       <div>
-        <strong>{t.footerCompany}</strong>
-        <a href="#api">{locale === "tr" ? "İletişim" : "Contact"}</a>
-        <a href="#features">{locale === "tr" ? "Güvenlik" : "Security"}</a>
+        <strong>{t("home.footerCompany")}</strong>
+        <a href="#api">{t("nav.contact")}</a>
+        <a href="#features">{t("nav.security")}</a>
         <a href="#features">Attribution</a>
       </div>
     </footer>

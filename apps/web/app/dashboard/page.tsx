@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useT } from "../../lib/i18n";
+import LangSwitch from "../../components/LangSwitch";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -49,6 +51,7 @@ type Job = {
 };
 
 export default function DashboardPage() {
+  const t = useT();
   const [apiKey, setApiKey] = useState("");
   const [workspace, setWorkspace] = useState("Workspace");
   const [usage, setUsage] = useState<Usage | null>(null);
@@ -84,7 +87,7 @@ export default function DashboardPage() {
     const response = await fetch(`${apiUrl}${path}`, { ...init, headers: { ...headers, ...init?.headers } });
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.detail ?? "API isteği başarısız oldu");
+      throw new Error(data.detail ?? t("dashboard.apiRequestFailed"));
     }
     return data;
   }
@@ -102,7 +105,7 @@ export default function DashboardPage() {
       setKeys(keyData);
       setJobs(jobData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Dashboard yüklenemedi");
+      setError(err instanceof Error ? err.message : t("dashboard.dashboardLoadError"));
       if (err instanceof Error && err.message.toLowerCase().includes("invalid")) {
         localStorage.removeItem("scrapling_cloud_api_key");
       }
@@ -117,12 +120,12 @@ export default function DashboardPage() {
     try {
       const key = await apiFetch<ApiKey>("/v1/api-keys", {
         method: "POST",
-        body: JSON.stringify({ name: "Production key" })
+        body: JSON.stringify({ name: t("dashboard.productionKey") })
       });
       setNewKey(key.key ?? "");
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Key oluşturulamadı");
+      setError(err instanceof Error ? err.message : t("dashboard.apiKeyCreateError"));
     } finally {
       setWorking(false);
     }
@@ -135,7 +138,7 @@ export default function DashboardPage() {
       await apiFetch(`/v1/api-keys/${id}`, { method: "DELETE" });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Key iptal edilemedi");
+      setError(err instanceof Error ? err.message : t("dashboard.apiKeyRevokeError"));
     } finally {
       setWorking(false);
     }
@@ -156,61 +159,61 @@ export default function DashboardPage() {
           Scrapling Cloud
         </Link>
         <nav>
-          <a href="#overview"><Activity size={18} /> Genel bakış</a>
-          <a href="#keys"><KeyRound size={18} /> API key</a>
-          {usage?.is_admin && <Link href="/admin"><ShieldCheck size={18} /> Admin</Link>}
-          <Link href="/playground"><ArrowRight size={18} /> Playground</Link>
-          <Link href="/batch"><Upload size={18} /> Toplu Analiz</Link>
-          <Link href="/data"><DatabaseZap size={18} /> Data Explorer</Link>
-          <a href={`${apiUrl}/docs`} target="_blank"><BookOpenText size={18} /> Docs</a>
+          <a href="#overview"><Activity size={18} /> {t("dashboard.overview")}</a>
+          <a href="#keys"><KeyRound size={18} /> {t("dashboard.apiKeys")}</a>
+          {usage?.is_admin && <Link href="/admin"><ShieldCheck size={18} /> {t("dashboard.admin")}</Link>}
+          <Link href="/playground"><ArrowRight size={18} /> {t("dashboard.playground")}</Link>
+          <Link href="/batch"><Upload size={18} /> {t("dashboard.batchAnalysis")}</Link>
+          <Link href="/data"><DatabaseZap size={18} /> {t("dashboard.dataExplorer")}</Link>
+          <a href={`${apiUrl}/docs`} target="_blank"><BookOpenText size={18} /> {t("dashboard.docs")}</a>
         </nav>
       </aside>
       <section className="dashboardMain">
         <header className="dashboardTop">
           <div>
-            <span>Dashboard</span>
+            <span>{t("dashboard.dashboard")}</span>
             <h1>{workspace}</h1>
           </div>
           <div className="dashboardActions">
             <button className="secondary" onClick={refresh} disabled={loading}>
               <RefreshCw size={18} />
-              Yenile
+              {t("common.refresh")}
             </button>
             <button className="secondary" onClick={logout}>
               <LogOut size={18} />
-              Çıkış
+              {t("common.logout")}
             </button>
           </div>
         </header>
 
         {error && <div className="formError dashboardError">{error}</div>}
-        {loading && <div className="loadingLine"><Loader2 className="spin" size={18} /> Dashboard yükleniyor</div>}
+        {loading && <div className="loadingLine"><Loader2 className="spin" size={18} /> {t("dashboard.dashboardLoading")}</div>}
 
         <section className="dashboardGrid" id="overview">
-          <Metric title="Plan" value={usage?.plan ?? "-"} />
-          <Metric title="Kalan kredi" value={usage ? usage.remaining_credits.toLocaleString("tr-TR") : "-"} />
-          <Metric title="Kullanılan kredi" value={usage ? usage.used_credits.toLocaleString("tr-TR") : "-"} />
-          <Metric title="Concurrency" value={usage ? String(usage.concurrency_limit) : "-"} />
+          <Metric title={t("dashboard.plan")} value={usage?.plan ?? "-"} />
+          <Metric title={t("dashboard.remainingCredits")} value={usage ? usage.remaining_credits.toLocaleString("tr-TR") : "-"} />
+          <Metric title={t("dashboard.usedCredits")} value={usage ? usage.used_credits.toLocaleString("tr-TR") : "-"} />
+          <Metric title={t("dashboard.concurrency")} value={usage ? String(usage.concurrency_limit) : "-"} />
         </section>
 
         <section className="dashboardPanel" id="keys">
           <div className="panelHeader">
             <div>
-              <h2>API key yönetimi</h2>
-              <p>Uygulamalarında Bearer token olarak kullanacağın key’leri buradan oluştur.</p>
+              <h2>{t("dashboard.apiKeyManagement")}</h2>
+              <p>{t("dashboard.apiKeyDesc")}</p>
             </div>
             <button className="primary" onClick={createKey} disabled={working}>
               <Plus size={18} />
-              Yeni key
+              {t("dashboard.newKey")}
             </button>
           </div>
           {newKey && (
             <div className="newKeyBox">
-              <strong>Yeni key, sadece şimdi gösterilir</strong>
+              <strong>{t("dashboard.newKeyWarning")}</strong>
               <code>{newKey}</code>
               <button onClick={() => navigator.clipboard.writeText(newKey)}>
                 <Copy size={16} />
-                Kopyala
+                {t("common.copy")}
               </button>
             </div>
           )}
@@ -219,11 +222,11 @@ export default function DashboardPage() {
               <article key={key.id}>
                 <div>
                   <strong>{key.name}</strong>
-                  <span>{key.prefix}... · {key.revoked ? "iptal edildi" : "aktif"}</span>
+                  <span>{key.prefix}... · {key.revoked ? t("dashboard.revoked") : t("dashboard.activeStatus")}</span>
                 </div>
                 <button onClick={() => revokeKey(key.id)} disabled={working || key.revoked}>
                   <Trash2 size={16} />
-                  İptal
+                  {t("common.revoke")}
                 </button>
               </article>
             ))}
@@ -232,36 +235,36 @@ export default function DashboardPage() {
 
         <section className="dashboardPanel playgroundLaunch">
           <div>
-            <span>Canlı test alanı</span>
-            <h2>Scrape Playground ayrı sekmede hazır</h2>
-            <p>URL gönder, formats/mode seç, ilerlemeyi canlı izle ve sonucu geniş ekranda incele.</p>
+            <span>{t("dashboard.liveTestArea")}</span>
+            <h2>{t("dashboard.playgroundReady")}</h2>
+            <p>{t("dashboard.playgroundDesc")}</p>
           </div>
           <Link className="primary" href="/playground">
-            Playground’u aç
+            {t("dashboard.openPlayground")}
             <ArrowRight size={18} />
           </Link>
         </section>
 
         <section className="dashboardPanel playgroundLaunch">
           <div>
-            <span>Toplu analiz</span>
-            <h2>Excel yükle, sosyal medya ve firma analizi al</h2>
-            <p>Site listeni .xlsx, .csv veya .txt olarak yükle; her site için sosyal medya hesapları ve kısa firma analizi içeren Excel raporu indir.</p>
+            <span>{t("dashboard.batchAnalysisTitle")}</span>
+            <h2>{t("dashboard.batchAnalysisDesc")}</h2>
+            <p>{t("dashboard.batchAnalysisDesc2")}</p>
           </div>
           <Link className="primary" href="/batch">
-            Toplu Analizi aç
+            {t("dashboard.openBatchAnalysis")}
             <ArrowRight size={18} />
           </Link>
         </section>
 
         <section className="dashboardPanel playgroundLaunch dataLaunch">
           <div>
-            <span>Derin veri çıkarımı</span>
-            <h2>Data Explorer ile tüm sayfaları tara</h2>
-            <p>Başlangıç URL’sinden aynı domain içinde derinlere in, sayfa metinlerini ve linkleri okunabilir kartlarda gör.</p>
+            <span>{t("dashboard.dataExtraction")}</span>
+            <h2>{t("dashboard.dataExplorerTitle")}</h2>
+            <p>{t("dashboard.dataExplorerDesc")}</p>
           </div>
           <Link className="primary" href="/data">
-            Data Explorer’ı aç
+            {t("dashboard.openDataExplorer")}
             <ArrowRight size={18} />
           </Link>
         </section>
@@ -269,19 +272,19 @@ export default function DashboardPage() {
         <section className="dashboardPanel">
           <div className="panelHeader">
             <div>
-              <h2>Son işler</h2>
-              <p>API üzerinden oluşturulan son scrape, crawl, map ve extract job’ları.</p>
+              <h2>{t("dashboard.recentJobs")}</h2>
+              <p>{t("dashboard.recentJobsDesc")}</p>
             </div>
           </div>
           <div className="tableList">
-            {jobs.length === 0 && <p className="emptyState">Henüz job yok.</p>}
+            {jobs.length === 0 && <p className="emptyState">{t("dashboard.noJobs")}</p>}
             {jobs.map((job) => (
               <article key={job.id}>
                 <div>
                   <strong>{job.kind} · {job.status}</strong>
                   <span>{job.url ?? job.id}</span>
                 </div>
-                <span>{job.credits} kredi</span>
+                <span>{job.credits} {t("dashboard.credits")}</span>
               </article>
             ))}
           </div>

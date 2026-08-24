@@ -3,12 +3,14 @@
 import { ArrowRight, KeyRound, Loader2, LockKeyhole, Mail } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { useT } from "../../lib/i18n";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type Mode = "login" | "signup";
 
 export default function LoginPage() {
+  const t = useT();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,14 +36,14 @@ export default function LoginPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.detail ?? "Giriş yapılamadı");
+        throw new Error(data.detail ?? t("auth.loginFailed"));
       }
       localStorage.setItem("scrapling_cloud_api_key", data.api_key);
       localStorage.setItem("scrapling_cloud_workspace", data.organization_name);
       localStorage.setItem("scrapling_cloud_is_admin", data.is_admin ? "true" : "false");
       window.location.href = "/dashboard";
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Beklenmeyen hata oluştu");
+      setError(err instanceof Error ? err.message : t("auth.unexpectedError"));
     } finally {
       setLoading(false);
     }
@@ -55,35 +57,35 @@ export default function LoginPage() {
           Scrapling Cloud
         </Link>
         <div>
-          <h1>{mode === "login" ? "Panele giriş yap" : "Yeni workspace oluştur"}</h1>
+          <h1>{mode === "login" ? t("auth.loginTitle") : t("auth.signupTitle")}</h1>
           <p>
-            API key üretmek, kullanımını görmek ve scraping işlerini takip etmek için dashboard’a gir.
+            {t("auth.loginDesc")}
           </p>
         </div>
         <div className="authSwitch">
           <button className={mode === "login" ? "selected" : ""} onClick={() => setMode("login")}>
-            Giriş
+            {t("auth.loginTab")}
           </button>
           <button className={mode === "signup" ? "selected" : ""} onClick={() => setMode("signup")}>
-            Kayıt
+            {t("auth.signupTab")}
           </button>
         </div>
         <form className="authForm" onSubmit={submit}>
           {mode === "signup" && (
             <label>
-              Workspace adı
+              {t("auth.workspaceName")}
               <input value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} />
             </label>
           )}
           <label>
-            E-posta
+            {t("auth.email")}
             <span>
               <Mail size={18} />
               <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
             </span>
           </label>
           <label>
-            Şifre
+            {t("auth.password")}
             <span>
               <LockKeyhole size={18} />
               <input
@@ -98,23 +100,23 @@ export default function LoginPage() {
           {error && <div className="formError">{error}</div>}
           <button className="primary authSubmit" type="submit" disabled={loading}>
             {loading ? <Loader2 className="spin" size={18} /> : <KeyRound size={18} />}
-            {mode === "login" ? "Dashboard’a gir" : "Hesap oluştur"}
+            {mode === "login" ? t("auth.enterDashboard") : t("auth.createAccount")}
             <ArrowRight size={18} />
           </button>
         </form>
       </section>
       <aside className="authAside">
         <div className="authMetric">
-          <span>Ücretsiz başlangıç kredisi</span>
+          <span>{t("auth.freeCredits")}</span>
           <strong>10,000</strong>
         </div>
         <div className="authMetric">
-          <span>Endpoint</span>
+          <span>{t("auth.endpoint")}</span>
           <strong>/v1/scrape</strong>
         </div>
         <pre>{`curl -X POST ${apiUrl}/v1/scrape \\
   -H "Authorization: Bearer sk_..." \\
-  -d '{"url":"https://example.com"}'`}</pre>
+  -d ‘{"url":"https://example.com"}’`}</pre>
       </aside>
     </main>
   );
