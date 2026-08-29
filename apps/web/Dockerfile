@@ -23,3 +23,7 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 EXPOSE 3000
 CMD ["node", "server.js"]
+
+# --- Agentic Security Firewall: Katman 2 (non-root hardening) ---
+RUN [ -d /app ] && chown -R node:node /app || true
+USER node
