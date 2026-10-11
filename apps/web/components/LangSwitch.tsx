@@ -7,7 +7,7 @@ interface LangSwitchProps {
   ariaLabel?: string;
 }
 
-export default function LangSwitch({ className = "", ariaLabel = "Language selector" }: LangSwitchProps) {
+export default function LangSwitch({ className = "", ariaLabel = "Dil seçimi" }: LangSwitchProps) {
   const [lang, setLang] = useLang();
 
   return (
@@ -15,7 +15,7 @@ export default function LangSwitch({ className = "", ariaLabel = "Language selec
       <button 
         className={lang === "tr" ? "selected" : ""} 
         onClick={() => setLang("tr")}
-        aria-label="Switch to Turkish"
+        aria-label="Türkçeye geç"
         aria-pressed={lang === "tr"}
       >
         TR
@@ -23,7 +23,7 @@ export default function LangSwitch({ className = "", ariaLabel = "Language selec
       <button 
         className={lang === "en" ? "selected" : ""} 
         onClick={() => setLang("en")}
-        aria-label="Switch to English"
+        aria-label="İngilizceye geç"
         aria-pressed={lang === "en"}
       >
         EN
