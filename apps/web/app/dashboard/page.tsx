@@ -16,9 +16,10 @@ import {
   Upload
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useT } from "../../lib/i18n";
 import LangSwitch from "../../components/LangSwitch";
+import { useStoredApiKey, useStoredValue } from "../../lib/use-stored-value";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -52,8 +53,8 @@ type Job = {
 
 export default function DashboardPage() {
   const t = useT();
-  const [apiKey, setApiKey] = useState("");
-  const [workspace, setWorkspace] = useState("Workspace");
+  const apiKey = useStoredApiKey();
+  const workspace = useStoredValue("scrapling_cloud_workspace") || "Çalışma alanı";
   const [usage, setUsage] = useState<Usage | null>(null);
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -64,33 +65,37 @@ export default function DashboardPage() {
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }), [apiKey]);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("scrapling_cloud_api_key");
-    const storedWorkspace = localStorage.getItem("scrapling_cloud_workspace");
-    if (!stored) {
-      window.location.href = "/login";
-      return;
-    }
-    setApiKey(stored);
-    if (storedWorkspace) {
-      setWorkspace(storedWorkspace);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (apiKey) {
-      void refresh();
-    }
-  }, [apiKey]);
-
-  async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const apiFetch = useCallback(async <T,>(path: string, init?: RequestInit): Promise<T> => {
     const response = await fetch(`${apiUrl}${path}`, { ...init, headers: { ...headers, ...init?.headers } });
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.detail ?? t("dashboard.apiRequestFailed"));
     }
     return data;
-  }
+  }, [headers, t]);
+
+  useEffect(() => {
+    if (!apiKey) return;
+    let active = true;
+    Promise.all([
+      apiFetch<Usage>("/v1/usage"),
+      apiFetch<ApiKey[]>("/v1/api-keys"),
+      apiFetch<Job[]>("/v1/jobs")
+    ])
+      .then(([usageData, keyData, jobData]) => {
+        if (!active) return;
+        setUsage(usageData);
+        setKeys(keyData);
+        setJobs(jobData);
+      })
+      .catch(err => {
+        if (active) setError(err instanceof Error ? err.message : t("dashboard.dashboardLoadError"));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [apiKey, apiFetch, t]);
 
   async function refresh() {
     setError("");
