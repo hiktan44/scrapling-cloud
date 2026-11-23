@@ -322,7 +322,7 @@ export default function Home() {
               <div className="stars">
                 {Array.from({ length: 5 }).map((_, index) => <Star size={16} fill="currentColor" key={index} />)}
               </div>
-              <p>"{item.quote}"</p>
+              <p>&ldquo;{item.quote}&rdquo;</p>
               <strong>{item.name}</strong>
               <span>{item.role}</span>
             </article>

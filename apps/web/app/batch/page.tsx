@@ -20,7 +20,8 @@ import {
   XCircle
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useStoredApiKey } from "../../lib/use-stored-value";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -64,7 +65,7 @@ const socialLabels: Array<{ key: string; label: string }> = [
 ];
 
 export default function BatchPage() {
-  const [apiKey, setApiKey] = useState("");
+  const apiKey = useStoredApiKey();
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [working, setWorking] = useState(false);
@@ -78,15 +79,6 @@ export default function BatchPage() {
     tone: "active" as ProgressTone
   });
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("scrapling_cloud_api_key");
-    if (!stored) {
-      window.location.href = "/login";
-      return;
-    }
-    setApiKey(stored);
-  }, []);
 
   async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${apiUrl}${path}`, {

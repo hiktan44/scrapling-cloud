@@ -20,7 +20,8 @@ import {
   Sparkles
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useStoredApiKey } from "../../lib/use-stored-value";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -54,7 +55,7 @@ const modeOptions: Array<{ value: Mode; label: string; text: string }> = [
 ];
 
 export default function PlaygroundPage() {
-  const [apiKey, setApiKey] = useState("");
+  const apiKey = useStoredApiKey();
   const [url, setUrl] = useState("https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/home");
   const [formats, setFormats] = useState<Format[]>(["markdown", "links", "metadata"]);
   const [mode, setMode] = useState<Mode>("auto");
@@ -72,15 +73,6 @@ export default function PlaygroundPage() {
   });
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }), [apiKey]);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("scrapling_cloud_api_key");
-    if (!stored) {
-      window.location.href = "/login";
-      return;
-    }
-    setApiKey(stored);
-  }, []);
 
   async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${apiUrl}${path}`, { ...init, headers: { ...headers, ...init?.headers } });

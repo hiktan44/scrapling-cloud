@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { useLang, pickByLang } from "./use-lang";
 
 // Translation dictionary with namespace structure
@@ -261,7 +262,7 @@ export function t(key: string, lang: import("./use-lang").Lang, vars?: Record<st
 // Hook that combines useLang and t
 export function useT(): (key: string, vars?: Record<string, string | number>) => string {
   const [lang] = useLang();
-  return (key: string, vars?: Record<string, string | number>) => t(key, lang, vars);
+  return useCallback((key: string, vars?: Record<string, string | number>) => t(key, lang, vars), [lang]);
 }
 
 // Export helper for use in server components or other contexts

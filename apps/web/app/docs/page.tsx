@@ -172,7 +172,7 @@ export default function DocsPage() {
       <header style={{ marginTop: 24, marginBottom: 32 }}>
         <h1 style={{ fontSize: 40, margin: "0 0 8px", letterSpacing: -1 }}>API {t("nav.docs")}</h1>
         <p style={{ color: "var(--muted)", fontSize: 17, maxWidth: 720 }}>
-          Scrapling Cloud, temiz web verisi gereken ürünler için scrape / crawl / map / extract / search / monitor API'sidir.
+          Scrapling Cloud; veri toplama, site tarama, haritalama, veri çıkarma, arama ve izleme için bir API sunar.
           Taban URL: <code style={{ background: "var(--soft)", padding: "2px 6px", borderRadius: 6 }}>{apiUrl}</code>
         </p>
       </header>

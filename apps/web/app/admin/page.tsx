@@ -14,8 +14,9 @@ import {
   WalletCards
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useT } from "../../lib/i18n";
+import { useStoredApiKey } from "../../lib/use-stored-value";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -44,13 +45,13 @@ type ApiKey = {
 
 export default function AdminPage() {
   const t = useT();
-  const [apiKey, setApiKey] = useState("");
+  const apiKey = useStoredApiKey();
   const [organizations, setOrganizations] = useState<AdminOrganization[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [credits, setCredits] = useState(10000);
-  const [plan, setPlan] = useState("");
-  const [concurrency, setConcurrency] = useState(5);
-  const [keyName, setKeyName] = useState("Customer production key");
+  const [plan, setPlan] = useState<string | null>(null);
+  const [concurrency, setConcurrency] = useState<number | null>(null);
+  const [keyName, setKeyName] = useState("Müşteri üretim anahtarı");
   const [newKey, setNewKey] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -60,37 +61,30 @@ export default function AdminPage() {
   const headers = useMemo(() => ({ Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }), [apiKey]);
   const selected = organizations.find((org) => org.id === selectedId) ?? organizations[0] ?? null;
 
-  useEffect(() => {
-    const stored = localStorage.getItem("scrapling_cloud_api_key");
-    if (!stored) {
-      window.location.href = "/login";
-      return;
-    }
-    setApiKey(stored);
-  }, []);
-
-  useEffect(() => {
-    if (apiKey) {
-      void refresh();
-    }
-  }, [apiKey]);
-
-  useEffect(() => {
-    if (selected) {
-      setSelectedId(selected.id);
-      setPlan(selected.plan);
-      setConcurrency(selected.concurrency_limit);
-    }
-  }, [selected?.id]);
-
-  async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const apiFetch = useCallback(async <T,>(path: string, init?: RequestInit): Promise<T> => {
     const response = await fetch(`${apiUrl}${path}`, { ...init, headers: { ...headers, ...init?.headers } });
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.detail ?? t("admin.adminRequestFailed"));
     }
     return data;
-  }
+  }, [headers, t]);
+
+  useEffect(() => {
+    if (!apiKey) return;
+    let active = true;
+    apiFetch<AdminOrganization[]>("/v1/admin/organizations")
+      .then(data => {
+        if (active) setOrganizations(data);
+      })
+      .catch(err => {
+        if (active) setError(err instanceof Error ? err.message : t("admin.adminLoadError"));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [apiKey, apiFetch, t]);
 
   async function refresh() {
     setError("");
@@ -121,8 +115,8 @@ export default function AdminPage() {
         body: JSON.stringify({
           operation,
           credits,
-          plan: plan.trim() || null,
-          concurrency_limit: concurrency
+          plan: (plan ?? selected.plan).trim() || null,
+          concurrency_limit: concurrency ?? selected.concurrency_limit
         })
       });
       setOrganizations((items) => items.map((item) => (item.id === updated.id ? updated : item)));
@@ -204,7 +198,7 @@ export default function AdminPage() {
           </div>
           <div className="adminOrgGrid">
             {organizations.map((org) => (
-              <button className={selectedId === org.id ? "selected" : ""} key={org.id} onClick={() => setSelectedId(org.id)}>
+              <button className={selected?.id === org.id ? "selected" : ""} key={org.id} onClick={() => { setSelectedId(org.id); setPlan(null); setConcurrency(null); }}>
                 <span>{org.owner_email ?? t("admin.noEmail")}</span>
                 <strong>{org.name}</strong>
                 <small>{org.plan} · {org.remaining_credits.toLocaleString("tr-TR")} {t("admin.remainingCredits")}</small>
@@ -225,11 +219,11 @@ export default function AdminPage() {
             </label>
             <label>
               {t("admin.plan")}
-              <input value={plan} onChange={(event) => setPlan(event.target.value)} />
+              <input value={plan ?? selected?.plan ?? ""} onChange={(event) => setPlan(event.target.value)} />
             </label>
             <label>
               {t("admin.concurrency")}
-              <input type="number" min={1} max={1000} value={concurrency} onChange={(event) => setConcurrency(Number(event.target.value))} />
+              <input type="number" min={1} max={1000} value={concurrency ?? selected?.concurrency_limit ?? 5} onChange={(event) => setConcurrency(Number(event.target.value))} />
             </label>
           </div>
           <div className="adminButtonRow">

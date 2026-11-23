@@ -19,7 +19,8 @@ import {
   Sparkles
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useStoredApiKey } from "../../lib/use-stored-value";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -86,7 +87,7 @@ type JobDetail = {
 };
 
 export default function DataExplorerPage() {
-  const [apiKey, setApiKey] = useState("");
+  const apiKey = useStoredApiKey();
   const [url, setUrl] = useState("https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/home");
   const [limit, setLimit] = useState(12);
   const [maxDepth, setMaxDepth] = useState(2);
@@ -112,15 +113,6 @@ export default function DataExplorerPage() {
     }
     return all.filter((page) => [page.url, page.title, page.description, page.markdown, page.text].some((value) => String(value ?? "").toLowerCase().includes(needle)));
   }, [query, result]);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("scrapling_cloud_api_key");
-    if (!stored) {
-      window.location.href = "/login";
-      return;
-    }
-    setApiKey(stored);
-  }, []);
 
   async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${apiUrl}${path}`, { ...init, headers: { ...headers, ...init?.headers } });
@@ -243,7 +235,7 @@ export default function DataExplorerPage() {
             </div>
           </div>
           <label>
-            Analiz prompt'u
+            Analiz talimatı
             <textarea
               className="promptInput"
               value={analysisPrompt}
