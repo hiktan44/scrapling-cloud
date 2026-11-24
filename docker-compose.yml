@@ -1,4 +1,41 @@
 services:
+  site-sayaci:
+    build:
+      context: ./site-sayaci
+    restart: unless-stopped
+    mem_limit: 128m
+    environment:
+      SITE_ID: scrapling-cloud
+      SITE_ORIGIN: https://scrape.seymata.com
+      SITE_VISITS_ENABLED: '${SITE_VISITS_ENABLED:-1}'
+    labels:
+      com.seymata.site-visits.app: 'scrapling-cloud'
+      com.seymata.site-visits.host: 'scrape.seymata.com'
+      com.seymata.site-visits.schema: '1'
+      traefik.enable: 'true'
+      traefik.docker.network: 'hn55uizrgir0pom9g5k1m2l0'
+      traefik.http.routers.visits-scrapling-cloud.rule: 'Host(`scrape.seymata.com`) && ((Path(`/.well-known/site-visits/client.mjs`) && (Method(`GET`) || Method(`HEAD`))) || (Path(`/.well-known/site-visits/page`) && Method(`POST`)))'
+      traefik.http.routers.visits-scrapling-cloud.entrypoints: 'https'
+      traefik.http.routers.visits-scrapling-cloud.tls: 'true'
+      traefik.http.routers.visits-scrapling-cloud.service: 'visits-scrapling-cloud'
+      traefik.http.routers.visits-scrapling-cloud.middlewares: 'visits-scrapling-cloud-privacy'
+      traefik.http.services.visits-scrapling-cloud.loadbalancer.server.port: '3806'
+      traefik.http.middlewares.visits-scrapling-cloud-privacy.headers.customrequestheaders.Cookie: ''
+      traefik.http.middlewares.visits-scrapling-cloud-privacy.headers.customrequestheaders.Authorization: ''
+      traefik.http.middlewares.visits-scrapling-cloud-privacy.headers.customrequestheaders.Proxy-Authorization: ''
+      traefik.http.middlewares.visits-scrapling-cloud-privacy.headers.customrequestheaders.Referer: ''
+      traefik.http.middlewares.visits-scrapling-cloud-privacy.headers.customrequestheaders.Forwarded: ''
+      traefik.http.middlewares.visits-scrapling-cloud-privacy.headers.customrequestheaders.X-Forwarded-For: ''
+      traefik.http.middlewares.visits-scrapling-cloud-privacy.headers.customrequestheaders.X-Real-IP: ''
+      traefik.http.middlewares.visits-scrapling-cloud-privacy.headers.customrequestheaders.CF-Connecting-IP: ''
+    expose:
+      - '3806'
+    volumes:
+      - site_visits_private:/var/lib/site-sayaci
+      - site_visits_out:/var/lib/site-sayaci/out
+    networks:
+      - site_visits_ingress
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -163,5 +200,14 @@ configs:
         safe_search: 0
 
 volumes:
+  site_visits_private:
+    name: hn55uizrgir0pom9g5k1m2l0_site_visits_private
+  site_visits_out:
+    name: hn55uizrgir0pom9g5k1m2l0_site_visits_out
   postgres_data:
   redis_data:
+
+networks:
+  site_visits_ingress:
+    external: true
+    name: hn55uizrgir0pom9g5k1m2l0

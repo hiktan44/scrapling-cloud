@@ -1,0 +1,20 @@
+#site-visit-preference {
+  position: fixed;
+  inset-inline-end: .6rem;
+  inset-block-end: max(.5rem, env(safe-area-inset-bottom));
+  z-index: 1000;
+  width: max-content;
+  max-width: min(24rem, 90vw);
+  max-height: 65vh;
+  overflow: auto;
+  padding: .25rem .6rem;
+  border: 1px solid #9ca3af;
+  border-radius: .5rem;
+  background: Canvas;
+  color: CanvasText;
+  font: 400 .83rem/1.45 system-ui, sans-serif;
+}
+#site-visit-preference summary { cursor: pointer; }
+#site-visit-preference label { display: block; margin-top: .5rem; }
+#site-visit-preference input { appearance: auto; }
+#site-visit-preference p { margin: .45rem 0; }
