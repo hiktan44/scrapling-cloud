@@ -6,9 +6,18 @@
   const choiceKey = 'site-visits:analytics-choice:v1';
   const visitKey = 'site-sayaci:istanbul-day:v1';
   const privacySignal = () => navigator.globalPrivacyControl === true || navigator.doNotTrack === '1';
+  const revokedKey = 'site-visits:withdrawn:v1';
+  const storageCheckKey = 'site-visits:writable:v1';
+  let withdrawnHere = false;
   function allowed() {
-    try { return localStorage.getItem(choiceKey) === 'yes' && !privacySignal(); }
-    catch { return false; }
+    if (withdrawnHere || privacySignal()) return false;
+    try {
+      if (localStorage.getItem(choiceKey) !== 'yes' || sessionStorage.getItem(revokedKey) === '1') return false;
+      // Do not restore a previous grant from storage that cannot save a withdrawal.
+      localStorage.setItem(storageCheckKey, '1');
+      localStorage.removeItem(storageCheckKey);
+      return true;
+    } catch { return false; }
   }
   const language = document.documentElement.lang?.split('-')[0];
   const text = ({
@@ -66,8 +75,20 @@
     } catch { /* Private mode, a blocked request or unavailable identity leaves the app usable. */ }
   }
   toggle.addEventListener('change', () => {
-    try { localStorage.setItem(choiceKey, toggle.checked && !privacySignal() ? 'yes' : 'no'); }
-    catch { toggle.checked = false; }
+    const grant = toggle.checked && !privacySignal();
+    withdrawnHere = true;
+    if (!grant) {
+      clearLocalId();
+      try { sessionStorage.setItem(revokedKey, '1'); } catch { /* The in-memory withdrawal still applies. */ }
+      try { localStorage.removeItem(choiceKey); } catch { /* Storage may be read-only. */ }
+    }
+    try {
+      localStorage.setItem(choiceKey, grant ? 'yes' : 'no');
+      if (grant) {
+        sessionStorage.removeItem(revokedKey);
+        withdrawnHere = false;
+      }
+    } catch { /* Do not count when a preference cannot be saved. */ }
     void sync();
   });
   window.addEventListener('site-visits-preference', sync);
