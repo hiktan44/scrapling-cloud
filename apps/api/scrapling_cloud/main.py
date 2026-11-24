@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime, timedelta
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
@@ -17,7 +18,7 @@ from .db import create_all, get_db
 from .intel import build_export_xlsx, parse_urls
 from .parse import parse_file
 from .jobs import create_job, requeue_stuck_jobs, webhook_secret_for
-from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, JobStatus, Monitor, MonitorCheck, Organization, UsageEvent, User
+from .models import ApiKey, DomainProfile, Job, JobEvent, JobKind, JobStatus, LoginEvent, Monitor, MonitorCheck, Organization, UsageEvent, User
 from .monitors import run_monitor_check
 from .queue import get_redis
 from .ratelimit import client_ip, rate_limit
@@ -51,6 +52,7 @@ from .scraper import map_url, scrape_url
 from .security import Principal, create_api_key, hash_api_key, hash_password, require_admin, require_api_key, verify_password
 from .seed import seed_admin, seed_demo
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 app = FastAPI(
     title="Scrapling Cloud API",
@@ -155,6 +157,23 @@ def create_dashboard_key(
     return raw_key
 
 
+def record_login(db: Session, user: User, method: str) -> None:
+    """Append one row to the login journal after a session key was issued.
+
+    Runs after the session commit, so a failure here rolls back only this
+    insert and never breaks sign-in.
+    """
+    try:
+        db.add(LoginEvent(user_id=user.id, method=method))
+        db.commit()
+    except Exception as exc:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning("login journal write failed (method=%s): %s", method, type(exc).__name__)
+
+
 def job_response(job: Job) -> JobResponse:
     return JobResponse(id=job.id, status=job.status, kind=job.kind, credits=job.credits, url=job.url)
 
@@ -169,7 +188,8 @@ def signup(payload: AuthSignup, request: Request, db: Session = Depends(get_db))
     organization = Organization(name=payload.organization_name.strip(), plan="starter", monthly_credits=10000, concurrency_limit=3)
     db.add(organization)
     db.flush()
-    db.add(User(organization_id=organization.id, email=email, password_hash=hash_password(payload.password), role="owner"))
+    user = User(organization_id=organization.id, email=email, password_hash=hash_password(payload.password), role="owner")
+    db.add(user)
     raw_key = create_dashboard_key(db, organization, "Default dashboard key")
     try:
         db.commit()
@@ -177,7 +197,9 @@ def signup(payload: AuthSignup, request: Request, db: Session = Depends(get_db))
         db.rollback()
         raise HTTPException(status_code=409, detail="Email already registered") from None
     db.refresh(organization)
-    return auth_response(raw_key, organization)
+    response = auth_response(raw_key, organization)
+    record_login(db, user, "register")
+    return response
 
 
 @app.post("/v1/auth/login", response_model=AuthResponse)
@@ -208,7 +230,9 @@ def login(payload: AuthLogin, request: Request, db: Session = Depends(get_db)) -
         stale.revoked = True
     raw_key = create_dashboard_key(db, organization, scopes=scopes)
     db.commit()
-    return auth_response(raw_key, organization, is_admin=user.role == "admin")
+    response = auth_response(raw_key, organization, is_admin=user.role == "admin")
+    record_login(db, user, "password")
+    return response
 
 
 @app.get("/v1/me", response_model=AuthResponse)

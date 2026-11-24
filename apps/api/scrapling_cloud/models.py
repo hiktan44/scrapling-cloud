@@ -57,6 +57,20 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class LoginEvent(Base):
+    """Successful dashboard sign-ins (one row per issued session), read by external reporting.
+
+    Holds no IP, user agent, token or password. created_at is naive UTC, like users.created_at.
+    """
+
+    __tablename__ = "login_events"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(String(32), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    method: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+
 class ApiKey(Base):
     __tablename__ = "api_keys"
 
